@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	obom "github.com/Azure/obom/internal"
+	"github.com/Azure/obom/internal/print"
+	obom "github.com/Azure/obom/pkg"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +26,7 @@ func showCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			obom.PrintSBOMSummary(sbom, desc)
+			print.PrintSBOMSummary(sbom, desc)
 		},
 	}
 
