@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	obom "github.com/Azure/obom/internal"
+	obom "github.com/Azure/obom/pkg"
 	"github.com/spf13/cobra"
 )
 

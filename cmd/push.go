@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 
-	obom "github.com/Azure/obom/internal"
+	"github.com/Azure/obom/internal/print"
+	obom "github.com/Azure/obom/pkg"
 	"github.com/spf13/cobra"
 
 	"oras.land/oras-go/v2/registry"
@@ -59,7 +60,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				os.Exit(1)
 			}
 
-			obom.PrintSBOMSummary(sbom, desc)
+			print.PrintSBOMSummary(sbom, desc)
 
 			annotations, err := obom.GetAnnotations(sbom)
 			if err != nil {
