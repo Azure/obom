@@ -54,7 +54,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				os.Exit(1)
 			}
 
-			sbom, desc, err := obom.LoadSBOM(opts.filename)
+			sbom, desc, err := obom.LoadSBOMFromFile(opts.filename)
 			if err != nil {
 				fmt.Println("Error loading SBOM:", err)
 				os.Exit(1)

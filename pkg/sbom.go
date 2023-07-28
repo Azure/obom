@@ -1,7 +1,6 @@
 package obom
 
 import (
-	"fmt"
 	"os"
 
 	"crypto/sha256"
@@ -25,21 +24,31 @@ const (
 	OCI_ANNOTATION_ANNOTATION_DATE    = "org.spdx.annotation_date"
 )
 
-// LoadSBOM loads an SPDX file into memory
-func LoadSBOM(filename string) (*v2_3.Document, *oci.Descriptor, error) {
+func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open file: %w", err)
+		return nil, nil, err
 	}
 	defer file.Close()
 
-	doc, err := json.Read(file)
+	fileSize, err := getFileSize(file)
 	if err != nil {
-		fmt.Printf("Error while parsing SPDX file %s: %v\n", filename, err)
 		return nil, nil, err
 	}
 
-	desc, err := GetFileDescriptor(filename)
+	return LoadSBOMFromReader(file, fileSize)
+}
+
+// LoadSBOM loads an SPDX file into memory
+func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.Descriptor, error) {
+	defer reader.Close()
+
+	doc, err := json.Read(reader)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	desc, err := getFileDescriptor(reader, size)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -47,19 +56,12 @@ func LoadSBOM(filename string) (*v2_3.Document, *oci.Descriptor, error) {
 	return doc, desc, nil
 }
 
-func GetFileDescriptor(filename string) (*oci.Descriptor, error) {
-	// Open the file
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
+func getFileDescriptor(reader io.ReadCloser, size int64) (*oci.Descriptor, error) {
 	// Create a new SHA256 hasher
 	hasher := sha256.New()
 
 	// Copy the file's contents into the hasher
-	if _, err := io.Copy(hasher, file); err != nil {
+	if _, err := io.Copy(hasher, reader); err != nil {
 		return nil, err
 	}
 
@@ -71,19 +73,23 @@ func GetFileDescriptor(filename string) (*oci.Descriptor, error) {
 
 	d := digest.NewDigestFromHex("sha256", hashString)
 
-	fInfo, err := file.Stat()
-	if err != nil {
-		return nil, err
-	}
-
-	fileSize := fInfo.Size()
 	desc := &oci.Descriptor{
 		MediaType: MEDIATYPE_SPDX,
 		Digest:    d,
-		Size:      fileSize,
+		Size:      size,
 	}
 
 	return desc, nil
+}
+
+func getFileSize(file *os.File) (int64, error) {
+	// Get the file size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return 0, err
+	}
+
+	return fileInfo.Size(), nil
 }
 
 // GetAnnotations returns the annotations from the SBOM
