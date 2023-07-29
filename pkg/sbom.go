@@ -24,6 +24,9 @@ const (
 	OCI_ANNOTATION_ANNOTATION_DATE    = "org.spdx.annotation_date"
 )
 
+// LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
+// It also calculates the file size and generates an OCI descriptor for the file.
+// It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
 func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -39,7 +42,10 @@ func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, error) 
 	return LoadSBOMFromReader(file, fileSize)
 }
 
-// LoadSBOM loads an SPDX file into memory
+// LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
+// and returns the loaded SPDX document and the OCI descriptor.
+// The size parameter is the size of the document in bytes.
+// If an error occurs during reading the document or generating the descriptor, the error will be returned.
 func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.Descriptor, error) {
 	defer reader.Close()
 
