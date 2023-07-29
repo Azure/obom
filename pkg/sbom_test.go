@@ -34,7 +34,6 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	}
 
 	// Check that the returned doc and desc have the expected values
-	// You'll need to replace these checks with checks that are appropriate for your code
 	if doc.DocumentName != "SPDX-Example" {
 		t.Errorf("expected document name to be 'SPDX-Example', got: %v", doc.DocumentName)
 	}
@@ -57,7 +56,6 @@ func TestLoadSBOMFromFile(t *testing.T) {
 	}
 
 	// Check that the returned doc and desc have the expected values
-	// You'll need to replace these checks with checks that are appropriate for your code
 	if doc.DocumentName != "SPDX-Tools-v2.0" {
 		t.Errorf("expected document name to be 'SPDX-Tools-v2.0', got: %v", doc.DocumentName)
 	}
