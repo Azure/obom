@@ -1,7 +1,10 @@
 package obom
 
 import (
+	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"crypto/sha256"
 	"encoding/hex"
@@ -20,6 +23,10 @@ const (
 	OCI_ANNOTATION_DOCUMENT_NAMESPACE = "org.spdx.namespace"
 	OCI_ANNOTATION_SPDX_VERSION       = "org.spdx.version"
 	OCI_ANNOTATION_CREATION_DATE      = "org.spdx.created"
+	OCI_ANNOTATION_CREATORS           = "org.spdx.creator"
+	OCI_ANNOTATION_PACKAGES           = "org.spdx.packages"
+	OCI_ANNOTATION_PACKAGE_COUNT      = "org.spdx.package_count"
+	OCI_ANNOTATION_FILES              = "org.spdx.files"
 	OCI_ANNOTATION_ANNOTATOR          = "org.spdx.annotator"
 	OCI_ANNOTATION_ANNOTATION_DATE    = "org.spdx.annotation_date"
 )
@@ -100,6 +107,15 @@ func getFileSize(file *os.File) (int64, error) {
 
 // GetAnnotations returns the annotations from the SBOM
 func GetAnnotations(sbom *v2_3.Document) (map[string]string, error) {
+        var creatorstrings []string
+	for _, creator := range sbom.CreationInfo.Creators {
+		creatorstrings = append(creatorstrings, fmt.Sprint(creator.Creator))
+	}
+
+	var packages []string
+	for _, pkg := range sbom.Packages {
+		packages = append(packages, fmt.Sprint(pkg.PackageName)+":"+fmt.Sprint(pkg.PackageVersion)+":"+fmt.Sprint(pkg.PackageLicenseDeclared))
+	}
 	annotations := make(map[string]string)
 
 	annotations[OCI_ANNOTATION_DOCUMENT_NAME] = sbom.DocumentName
@@ -107,6 +123,10 @@ func GetAnnotations(sbom *v2_3.Document) (map[string]string, error) {
 	annotations[OCI_ANNOTATION_DOCUMENT_NAMESPACE] = sbom.DocumentNamespace
 	annotations[OCI_ANNOTATION_SPDX_VERSION] = sbom.SPDXVersion
 	annotations[OCI_ANNOTATION_CREATION_DATE] = sbom.CreationInfo.Created
+	annotations[OCI_ANNOTATION_CREATORS] = strings.Join(creatorstrings, ", ")
+	annotations[OCI_ANNOTATION_PACKAGE_COUNT] = strconv.Itoa(len(sbom.Packages))
+	annotations[OCI_ANNOTATION_PACKAGES] = strings.Join(packages, ", ")
+	annotations[OCI_ANNOTATION_FILES] = strconv.Itoa(len(sbom.Files))
 
 	return annotations, nil
 }
