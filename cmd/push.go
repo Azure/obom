@@ -78,7 +78,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				annotations[k] = v
 			}
 
-			err = obom.PushFiles(opts.filename, opts.reference, annotations, opts.username, opts.password)
+			err = obom.PushSBOM(sbom, desc, opts.reference, annotations, opts.username, opts.password)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)

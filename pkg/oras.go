@@ -1,14 +1,17 @@
 package obom
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	credentials "github.com/oras-project/oras-credentials-go"
+	"github.com/spdx/tools-golang/spdx/v2/v2_3"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/file"
+	"oras.land/oras-go/v2/content/memory"
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
@@ -111,5 +114,98 @@ func PushFiles(filename string, reference string, spdx_annotations map[string]st
 
 	//Copy from the file store to the remote repository
 	_, err = oras.Copy(ctx, fs, tag, repo, tag, oras.DefaultCopyOptions)
+	return err
+}
+
+// PushSBOM pushes the SPDX SBOM bytes to the registry
+func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, reference string, spdx_annotations map[string]string, username string, password string) error {
+	mem := memory.New()
+	ctx := context.Background()
+
+	// Unmarshal the SPDX Document into a byte array
+	var sbomBytes []byte
+	err := sbomDoc.UnmarshalJSON(sbomBytes)
+	if err != nil {
+		return err
+	}
+
+	// Add bytes to a reader
+	sbomReader := bytes.NewReader(sbomBytes)
+
+	// Add descriptor to a memory store
+	err = mem.Push(ctx, *sbomDescriptor, sbomReader)
+	if err != nil {
+		return err
+	}
+
+	annotations := make(map[string]string)
+	for k, v := range spdx_annotations {
+		annotations[k] = v
+	}
+
+	//Pack the files and tag the packed manifest
+	artifactType := MEDIATYPE_SPDX
+	descriptors := []v1.Descriptor{*sbomDescriptor}
+	manifestDescriptor, err := oras.Pack(ctx, mem, artifactType, descriptors, oras.PackOptions{
+		PackImageManifest:   true,
+		ManifestAnnotations: annotations,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Use the latest tag isf no tag is specified
+	tag := "latest"
+	ref, err := registry.ParseReference(reference)
+	if err != nil {
+		return err
+	}
+
+	if ref.Reference != "" {
+		tag = ref.Reference
+	}
+	fmt.Printf("Pushing %s/%s:%s %s\n", ref.Registry, ref.Repository, tag, manifestDescriptor.Digest)
+	if err = mem.Tag(ctx, manifestDescriptor, tag); err != nil {
+		return err
+	}
+
+	//Connect to a remote repository
+	repo, err := remote.NewRepository(reference)
+	if err != nil {
+		panic(err)
+	}
+
+	// Check if registry has is localhost or starts with localhost:
+	reg := repo.Reference.Registry
+	if strings.HasPrefix(reg, "localhost:") {
+		repo.PlainHTTP = true
+	}
+
+	// Prepare the auth client for the registry
+	client := &auth.Client{
+		Client: retry.DefaultClient,
+		Cache:  auth.DefaultCache,
+	}
+
+	if len(username) != 0 && len(password) != 0 {
+		client.Credential = auth.StaticCredential(reg, auth.Credential{
+			Username: username,
+			Password: password,
+		})
+	} else {
+		storeOpts := credentials.StoreOptions{}
+		store, err := credentials.NewStoreFromDocker(storeOpts)
+		if err != nil {
+			return err
+		}
+
+		client.Credential = credentials.Credential(store)
+	}
+
+	client.SetUserAgent(APPLICATION_USERAGENT)
+	repo.Client = client
+
+	// Copy from the memory store to the remote repository
+	_, err = oras.Copy(ctx, mem, tag, repo, tag, oras.DefaultCopyOptions)
 	return err
 }
