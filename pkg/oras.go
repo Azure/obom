@@ -8,10 +8,13 @@ import (
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	credentials "github.com/oras-project/oras-credentials-go"
+
 	"github.com/spdx/tools-golang/spdx/v2/v2_3"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/file"
 	"oras.land/oras-go/v2/content/memory"
+
+	// "oras.land/oras-go/v2/content/reader"
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
@@ -21,6 +24,8 @@ import (
 const (
 	APPLICATION_USERAGENT = "obom"
 )
+
+type CredentialsResolver = func(context.Context, string) (auth.Credential, error)
 
 // PushFiles pushes the SPDX SBOM file to the registry
 func PushFiles(filename string, reference string, spdx_annotations map[string]string, username string, password string) error {
@@ -118,24 +123,17 @@ func PushFiles(filename string, reference string, spdx_annotations map[string]st
 }
 
 // PushSBOM pushes the SPDX SBOM bytes to the registry
-func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, reference string, spdx_annotations map[string]string, username string, password string) error {
+func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, credsResolver CredentialsResolver) error {
 	mem := memory.New()
 	ctx := context.Background()
-
-	// Unmarshal the SPDX Document into a byte array
-	var sbomBytes []byte
-	err := sbomDoc.UnmarshalJSON(sbomBytes)
-	if err != nil {
-		return err
-	}
 
 	// Add bytes to a reader
 	sbomReader := bytes.NewReader(sbomBytes)
 
 	// Add descriptor to a memory store
-	err = mem.Push(ctx, *sbomDescriptor, sbomReader)
+	err := mem.Push(ctx, *sbomDescriptor, sbomReader)
 	if err != nil {
-		return err
+		return fmt.Errorf("error pushing image into memory store: %w", err)
 	}
 
 	annotations := make(map[string]string)
@@ -151,14 +149,14 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, reference s
 		ManifestAnnotations: annotations,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error packing image: %w", err)
 	}
 
 	// Use the latest tag isf no tag is specified
 	tag := "latest"
 	ref, err := registry.ParseReference(reference)
 	if err != nil {
-		return err
+		return fmt.Errorf("error parsing reference: %w", err)
 	}
 
 	if ref.Reference != "" {
@@ -172,7 +170,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, reference s
 	//Connect to a remote repository
 	repo, err := remote.NewRepository(reference)
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("error connecting to remote repository: %w", err))
 	}
 
 	// Check if registry has is localhost or starts with localhost:
@@ -187,20 +185,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, reference s
 		Cache:  auth.DefaultCache,
 	}
 
-	if len(username) != 0 && len(password) != 0 {
-		client.Credential = auth.StaticCredential(reg, auth.Credential{
-			Username: username,
-			Password: password,
-		})
-	} else {
-		storeOpts := credentials.StoreOptions{}
-		store, err := credentials.NewStoreFromDocker(storeOpts)
-		if err != nil {
-			return err
-		}
-
-		client.Credential = credentials.Credential(store)
-	}
+	client.Credential = credsResolver
 
 	client.SetUserAgent(APPLICATION_USERAGENT)
 	repo.Client = client

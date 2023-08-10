@@ -1,11 +1,11 @@
 package obom
 
 import (
-	"os"
-
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"io"
+	"os"
 
 	"github.com/opencontainers/go-digest"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
@@ -27,16 +27,16 @@ const (
 // LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
 // It also calculates the file size and generates an OCI descriptor for the file.
 // It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
-func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, error) {
+func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	defer file.Close()
 
 	fileSize, err := getFileSize(file)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	return LoadSBOMFromReader(file, fileSize)
@@ -46,23 +46,25 @@ func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, error) 
 // and returns the loaded SPDX document and the OCI descriptor.
 // The size parameter is the size of the document in bytes.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.Descriptor, error) {
+func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.Descriptor, []byte, error) {
 	defer reader.Close()
-
-	doc, err := json.Read(reader)
+	var buf = &bytes.Buffer{}
+	clonedReader := io.TeeReader(reader, buf)
+	doc, err := json.Read(clonedReader)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	desc, err := getFileDescriptor(reader, size)
+	sbomReader := bytes.NewReader(buf.Bytes())
+	desc, err := getFileDescriptor(sbomReader, size)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	return doc, desc, nil
+	return doc, desc, buf.Bytes(), nil
 }
 
-func getFileDescriptor(reader io.ReadCloser, size int64) (*oci.Descriptor, error) {
+func getFileDescriptor(reader io.Reader, size int64) (*oci.Descriptor, error) {
 	// Create a new SHA256 hasher
 	hasher := sha256.New()
 
