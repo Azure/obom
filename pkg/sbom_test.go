@@ -26,7 +26,7 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Call the function with the test reader
-	doc, desc, err := LoadSBOMFromReader(reader, size)
+	doc, desc, _, err := LoadSBOMFromReader(reader, size)
 
 	// Check that there was no error
 	if err != nil {
@@ -48,7 +48,7 @@ func TestLoadSBOMFromFile(t *testing.T) {
 	size := int64(21342)
 
 	// Call the function with the test file path
-	doc, desc, err := LoadSBOMFromFile(filePath)
+	doc, desc, _, err := LoadSBOMFromFile(filePath)
 
 	// Check that there was no error
 	if err != nil {
