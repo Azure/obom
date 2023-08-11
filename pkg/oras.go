@@ -25,12 +25,14 @@ const (
 
 type CredentialsResolver = func(context.Context, string) (auth.Credential, error)
 
-// PushSBOM pushes the SPDX SBOM bytes to the registry
+// PushSBOM pushes the SPDX SBOM bytes to the registry as an OCI artifact.
+// It takes in a pointer to an SPDX document, a pointer to a descriptor, a byte slice of the SBOM, a reference string, a map of SPDX annotations, and a credentials resolver function.
+// It returns an error if there was an issue pushing the SBOM to the registry.
 func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, credsResolver CredentialsResolver) error {
 	mem := memory.New()
 	ctx := context.Background()
 
-	// Add bytes to a reader
+	// Create a Reader for the bytes
 	sbomReader := bytes.NewReader(sbomBytes)
 
 	// Add descriptor to a memory store
@@ -39,6 +41,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 		return fmt.Errorf("error pushing image into memory store: %w", err)
 	}
 
+	// Add annotations to the manifest
 	annotations := make(map[string]string)
 	for k, v := range spdx_annotations {
 		annotations[k] = v
@@ -55,7 +58,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 		return fmt.Errorf("error packing image: %w", err)
 	}
 
-	// Use the latest tag isf no tag is specified
+	// Use the latest tag if no tag is specified
 	tag := "latest"
 	ref, err := registry.ParseReference(reference)
 	if err != nil {
@@ -70,7 +73,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 		return err
 	}
 
-	//Connect to a remote repository
+	// Connect to a remote repository
 	repo, err := remote.NewRepository(reference)
 	if err != nil {
 		panic(fmt.Errorf("error connecting to remote repository: %w", err))
