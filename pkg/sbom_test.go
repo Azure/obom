@@ -1,6 +1,7 @@
 package obom
 
 import (
+	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -20,13 +21,14 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	}`
 
 	// Calculate the size of the SPDX string in bytes
-	size := int64(len([]byte(spdx)))
+	expectedBytes := []byte(spdx)
+	size := int64(len(expectedBytes))
 
 	// Create a test reader with the SPDX JSON data
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Call the function with the test reader
-	doc, desc, _, err := LoadSBOMFromReader(reader, size)
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, size)
 
 	// Check that there was no error
 	if err != nil {
@@ -39,6 +41,10 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	}
 	if desc.Size != size {
 		t.Errorf("expected desc.Size to be %v, got: %v", size, desc.Size)
+	}
+	// Check if the byte arrays are equal
+	if !bytes.Equal(sbomBytes, expectedBytes) {
+		t.Errorf("expected sbomBytes to be %v, got: %v", expectedBytes, sbomBytes)
 	}
 }
 
