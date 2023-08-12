@@ -67,7 +67,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 	if ref.Reference != "" {
 		tag = ref.Reference
 	}
-	fmt.Printf("Pushing %s/%s:%s %s\n", ref.Registry, ref.Repository, tag, manifestDescriptor.Digest)
+
 	if err = mem.Tag(ctx, manifestDescriptor, tag); err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 	// Connect to a remote repository
 	repo, err := remote.NewRepository(reference)
 	if err != nil {
-		panic(fmt.Errorf("error connecting to remote repository: %w", err))
+		return fmt.Errorf("error connecting to remote repository: %w", err)
 	}
 
 	// Check if registry has is localhost or starts with localhost:
