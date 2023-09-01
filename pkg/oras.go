@@ -37,7 +37,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 	// Add descriptor to a memory store
 	err := mem.Push(ctx, *sbomDescriptor, sbomReader)
 	if err != nil {
-		return fmt.Errorf("error pushing image into memory store: %w", err)
+		return fmt.Errorf("error pushing SBOM into memory store: %w", err)
 	}
 
 	// Add annotations to the manifest
@@ -48,13 +48,13 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 
 	// Pack the files and tag the packed manifest
 	artifactType := MEDIATYPE_SPDX
-	descriptors := []v1.Descriptor{*sbomDescriptor}
-	manifestDescriptor, err := oras.Pack(ctx, mem, artifactType, descriptors, oras.PackOptions{
-		PackImageManifest:   true,
+	layers := []v1.Descriptor{*sbomDescriptor}
+	manifestDescriptor, err := oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1_RC4, artifactType, oras.PackManifestOptions{
+		Layers:              layers,
 		ManifestAnnotations: annotations,
 	})
 	if err != nil {
-		return fmt.Errorf("error packing image: %w", err)
+		return fmt.Errorf("error packing manifest: %w", err)
 	}
 
 	// Use the latest tag if no tag is specified
