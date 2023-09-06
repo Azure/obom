@@ -1,14 +1,17 @@
 package obom
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	credentials "github.com/oras-project/oras-credentials-go"
+
+	"github.com/spdx/tools-golang/spdx/v2/v2_3"
 	"oras.land/oras-go/v2"
-	"oras.land/oras-go/v2/content/file"
+	"oras.land/oras-go/v2/content/memory"
+
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
@@ -19,64 +22,60 @@ const (
 	APPLICATION_USERAGENT = "obom"
 )
 
-// PushFiles pushes the SPDX SBOM file to the registry
-func PushFiles(filename string, reference string, spdx_annotations map[string]string, username string, password string) error {
+type CredentialsResolver = func(context.Context, string) (auth.Credential, error)
 
-	// 0. Create a file store
-	fs, err := file.New(".")
-	if err != nil {
-		return err
-	}
-	defer fs.Close()
+// PushSBOM pushes the SPDX SBOM bytes to the registry as an OCI artifact.
+// It takes in a pointer to an SPDX document, a pointer to a descriptor, a byte slice of the SBOM, a reference string, a map of SPDX annotations, and a credentials resolver function.
+// It returns an error if there was an issue pushing the SBOM to the registry.
+func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, credsResolver CredentialsResolver) error {
+	mem := memory.New()
 	ctx := context.Background()
 
-	// Add files to a file store
-	mediaType := MEDIATYPE_SPDX
-	fileNames := []string{filename}
-	fileDescriptors := make([]v1.Descriptor, 0, len(fileNames))
-	for _, name := range fileNames {
-		fileDescriptor, err := fs.Add(ctx, name, mediaType, "")
-		if err != nil {
-			return err
-		}
-		fileDescriptors = append(fileDescriptors, fileDescriptor)
-		fmt.Printf("Adding %s: %s\n", name, fileDescriptor.Digest)
+	// Create a Reader for the bytes
+	sbomReader := bytes.NewReader(sbomBytes)
+
+	// Add descriptor to a memory store
+	err := mem.Push(ctx, *sbomDescriptor, sbomReader)
+	if err != nil {
+		return fmt.Errorf("error pushing SBOM into memory store: %w", err)
 	}
 
+	// Add annotations to the manifest
 	annotations := make(map[string]string)
 	for k, v := range spdx_annotations {
 		annotations[k] = v
 	}
 
-	//Pack the files and tag the packed manifest
+	// Pack the files and tag the packed manifest
 	artifactType := MEDIATYPE_SPDX
-	manifestDescriptor, err := oras.Pack(ctx, fs, artifactType, fileDescriptors, oras.PackOptions{
-		PackImageManifest:   true,
+	layers := []v1.Descriptor{*sbomDescriptor}
+	manifestDescriptor, err := oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1_RC4, artifactType, oras.PackManifestOptions{
+		Layers:              layers,
 		ManifestAnnotations: annotations,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("error packing manifest: %w", err)
 	}
 
-	// Use the latest tag isf no tag is specified
+	// Use the latest tag if no tag is specified
 	tag := "latest"
 	ref, err := registry.ParseReference(reference)
 	if err != nil {
-		return err
+		return fmt.Errorf("error parsing reference: %w", err)
 	}
 
 	if ref.Reference != "" {
 		tag = ref.Reference
 	}
-	fmt.Printf("Pushing %s/%s:%s %s\n", ref.Registry, ref.Repository, tag, manifestDescriptor.Digest)
-	if err = fs.Tag(ctx, manifestDescriptor, tag); err != nil {
+
+	if err = mem.Tag(ctx, manifestDescriptor, tag); err != nil {
 		return err
 	}
 
-	//Connect to a remote repository
+	// Connect to a remote repository
 	repo, err := remote.NewRepository(reference)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("error connecting to remote repository: %w", err)
 	}
 
 	// Check if registry has is localhost or starts with localhost:
@@ -91,25 +90,12 @@ func PushFiles(filename string, reference string, spdx_annotations map[string]st
 		Cache:  auth.DefaultCache,
 	}
 
-	if len(username) != 0 && len(password) != 0 {
-		client.Credential = auth.StaticCredential(reg, auth.Credential{
-			Username: username,
-			Password: password,
-		})
-	} else {
-		storeOpts := credentials.StoreOptions{}
-		store, err := credentials.NewStoreFromDocker(storeOpts)
-		if err != nil {
-			return err
-		}
-
-		client.Credential = credentials.Credential(store)
-	}
+	client.Credential = credsResolver
 
 	client.SetUserAgent(APPLICATION_USERAGENT)
 	repo.Client = client
 
-	//Copy from the file store to the remote repository
-	_, err = oras.Copy(ctx, fs, tag, repo, tag, oras.DefaultCopyOptions)
+	// Copy from the memory store to the remote repository
+	_, err = oras.Copy(ctx, mem, tag, repo, tag, oras.DefaultCopyOptions)
 	return err
 }

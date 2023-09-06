@@ -8,9 +8,11 @@ import (
 
 	"github.com/Azure/obom/internal/print"
 	obom "github.com/Azure/obom/pkg"
+	credentials "github.com/oras-project/oras-credentials-go"
 	"github.com/spf13/cobra"
 
 	"oras.land/oras-go/v2/registry"
+	"oras.land/oras-go/v2/registry/remote/auth"
 )
 
 type pushOpts struct {
@@ -48,13 +50,13 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 			opts.reference = args[0]
 
 			// validate if reference is valid
-			_, err := registry.ParseReference(opts.reference)
+			ref, err := registry.ParseReference(opts.reference)
 			if err != nil {
 				fmt.Println("Error parsing reference:", err)
 				os.Exit(1)
 			}
 
-			sbom, desc, err := obom.LoadSBOMFromFile(opts.filename)
+			sbom, desc, bytes, err := obom.LoadSBOMFromFile(opts.filename)
 			if err != nil {
 				fmt.Println("Error loading SBOM:", err)
 				os.Exit(1)
@@ -78,7 +80,14 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				annotations[k] = v
 			}
 
-			err = obom.PushFiles(opts.filename, opts.reference, annotations, opts.username, opts.password)
+			// get the credentials resolver
+			resolver, err := getCredentialsResolver(ref.Registry, opts.username, opts.password)
+			if err != nil {
+				fmt.Println("Error getting credentials resolver:", err)
+				os.Exit(1)
+			}
+
+			err = obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, resolver)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)
@@ -113,4 +122,20 @@ func parseAnnotationFlags(flags []string) (map[string]string, error) {
 		manifestAnnotations[key] = val
 	}
 	return manifestAnnotations, nil
+}
+
+func getCredentialsResolver(registry string, username string, password string) (obom.CredentialsResolver, error) {
+	if len(username) != 0 && len(password) != 0 {
+		return auth.StaticCredential(registry, auth.Credential{
+			Username: username,
+			Password: password,
+		}), nil
+	} else {
+		storeOpts := credentials.StoreOptions{}
+		store, err := credentials.NewStoreFromDocker(storeOpts)
+		if err != nil {
+			return nil, err
+		}
+		return credentials.Credential(store), nil
+	}
 }
