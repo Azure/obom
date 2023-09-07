@@ -26,7 +26,6 @@ func PrintCreatorInfo(doc *v2_3.Document) {
 func PrintSBOMSummary(doc *v2_3.Document, desc *oci.Descriptor) {
 	fmt.Println(strings.Repeat("=", 80))
 	fmt.Printf("Document Name:         %s\n", doc.DocumentName)
-	fmt.Printf("DataLicense:           %s\n", doc.DataLicense)
 	fmt.Printf("Document Namespace:    %s\n", doc.DocumentNamespace)
 	fmt.Printf("SPDX Version:          %s\n", doc.SPDXVersion)
 	fmt.Printf("Creation Date:         %s\n", doc.CreationInfo.Created)

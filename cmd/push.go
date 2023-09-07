@@ -20,6 +20,7 @@ type pushOpts struct {
 	reference           string
 	username            string
 	password            string
+	pushSummary         bool
 	ManifestAnnotations []string
 }
 
@@ -87,7 +88,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				os.Exit(1)
 			}
 
-			err = obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, resolver)
+			err = obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, resolver, opts.pushSummary)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)
@@ -102,6 +103,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 
 	pushCmd.Flags().StringVarP(&opts.username, "username", "u", "", "Username for the registry")
 	pushCmd.Flags().StringVarP(&opts.password, "password", "p", "", "Password for the registry")
+	pushCmd.Flags().BoolVarP(&opts.pushSummary, "pushSummary", "s", false, "Push summary blob to the registry")
 
 	// Add positional argument called reference to pushCmd
 	pushCmd.Args = cobra.ExactArgs(1)

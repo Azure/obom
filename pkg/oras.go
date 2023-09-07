@@ -3,6 +3,7 @@ package obom
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,7 +28,7 @@ type CredentialsResolver = func(context.Context, string) (auth.Credential, error
 // PushSBOM pushes the SPDX SBOM bytes to the registry as an OCI artifact.
 // It takes in a pointer to an SPDX document, a pointer to a descriptor, a byte slice of the SBOM, a reference string, a map of SPDX annotations, and a credentials resolver function.
 // It returns an error if there was an issue pushing the SBOM to the registry.
-func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, credsResolver CredentialsResolver) error {
+func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, credsResolver CredentialsResolver, pushSummary bool) error {
 	mem := memory.New()
 	ctx := context.Background()
 
@@ -40,15 +41,34 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 		return fmt.Errorf("error pushing SBOM into memory store: %w", err)
 	}
 
+	layers := []v1.Descriptor{*sbomDescriptor}
+
 	// Add annotations to the manifest
 	annotations := make(map[string]string)
 	for k, v := range spdx_annotations {
 		annotations[k] = v
 	}
 
+	// add the summary blob as a layer if pushSummary is set
+	if pushSummary {
+		sbomSummary, err := GetSBOMSummary(sbomDoc)
+		if err != nil {
+			return fmt.Errorf("error getting SBOM summary: %w", err)
+		}
+		// Marshal the summary into a string
+		summaryBytes, err := json.Marshal(sbomSummary)
+		if err != nil {
+			return fmt.Errorf("error marshaling summary into bytes: %w", err)
+		}
+		summaryDescriptor, err := oras.PushBytes(ctx, mem, "application/json", summaryBytes)
+		if err != nil {
+			return fmt.Errorf("error pushing summary into memory store: %w", err)
+		}
+		layers = append(layers, summaryDescriptor)
+	}
+
 	// Pack the files and tag the packed manifest
 	artifactType := MEDIATYPE_SPDX
-	layers := []v1.Descriptor{*sbomDescriptor}
 	manifestDescriptor, err := oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1_RC4, artifactType, oras.PackManifestOptions{
 		Layers:              layers,
 		ManifestAnnotations: annotations,
