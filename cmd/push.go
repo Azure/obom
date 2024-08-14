@@ -8,11 +8,10 @@ import (
 
 	"github.com/Azure/obom/internal/print"
 	obom "github.com/Azure/obom/pkg"
-	credentials "github.com/oras-project/oras-credentials-go"
 	"github.com/spf13/cobra"
-
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/credentials"
 )
 
 type pushOpts struct {
