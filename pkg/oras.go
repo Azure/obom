@@ -69,7 +69,7 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 
 	// Pack the files and tag the packed manifest
 	artifactType := MEDIATYPE_SPDX
-	manifestDescriptor, err := oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1_RC4, artifactType, oras.PackManifestOptions{
+	manifestDescriptor, err := oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1, artifactType, oras.PackManifestOptions{
 		Layers:              layers,
 		ManifestAnnotations: annotations,
 	})
