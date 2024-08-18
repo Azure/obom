@@ -2,14 +2,11 @@ package obom
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/opencontainers/go-digest"
 	oci "github.com/opencontainers/image-spec/specs-go/v1"
 	purl "github.com/package-url/packageurl-go"
 	json "github.com/spdx/tools-golang/json"
@@ -70,57 +67,12 @@ func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.
 	sbomReader.Reset(sbomBytes)
 
 	// Generate the OCI descriptor for the SPDX document
-	desc, err := getFileDescriptor(sbomReader, size)
+	desc, err := getFileDescriptor(MEDIATYPE_SPDX, sbomReader, size)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
 	return doc, desc, sbomBytes, nil
-}
-
-func getFileDescriptor(reader io.Reader, size int64) (*oci.Descriptor, error) {
-	// Create a new SHA256 hasher
-	hasher := sha256.New()
-
-	// Copy the file's contents into the hasher
-	if _, err := io.Copy(hasher, reader); err != nil {
-		return nil, err
-	}
-
-	// Get the resulting hash as a byte slice
-	hash := hasher.Sum(nil)
-
-	// Convert the hash to a hexadecimal string
-	hashString := hex.EncodeToString(hash)
-
-	d := digest.NewDigestFromHex("sha256", hashString)
-
-	desc := &oci.Descriptor{
-		MediaType: MEDIATYPE_SPDX,
-		Digest:    d,
-		Size:      size,
-	}
-
-	return desc, nil
-}
-
-func getFileSize(file *os.File) (int64, error) {
-	// Get the file size
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	return fileInfo.Size(), nil
-}
-
-func readAllBytes(reader io.Reader) ([]byte, error) {
-	var buf bytes.Buffer
-	_, err := io.Copy(&buf, reader)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 // GetAnnotations returns the annotations from the SBOM
