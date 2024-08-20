@@ -1,7 +1,6 @@
 package obom
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"testing"
@@ -29,21 +28,10 @@ func TestAttachArtifact_Success(t *testing.T) {
 	// Create some artifact bytes
 	artifactBytes := []byte(testArtifact)
 
-	artifactReader := bytes.NewReader(artifactBytes)
-	artifactDigest, err := getDigestFromReader(artifactReader)
-	if err != nil {
-		t.Fatalf("error getting digest from reader: %v", err)
-	}
-
 	// Create an artifact descriptor
-	artifactDescriptor := v1.Descriptor{
-		MediaType: testArtifactType,
-		Digest:    artifactDigest,
-		Size:      int64(len(artifactBytes)),
-	}
-
+	artifactDescriptor := getOCIDescriptor(testArtifactType, artifactBytes)
 	// Call the AttachArtifact function
-	artifactManifest, err := AttachArtifact(&subjectDescriptor, &artifactDescriptor, testArtifactType, artifactBytes, memDest)
+	artifactManifest, err := AttachArtifact(&subjectDescriptor, artifactDescriptor, testArtifactType, artifactBytes, memDest)
 
 	// Check that there was no error
 	if err != nil {

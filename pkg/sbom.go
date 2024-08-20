@@ -33,23 +33,16 @@ func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, []byte,
 	}
 	defer file.Close()
 
-	fileSize, err := getFileSize(file)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return LoadSBOMFromReader(file, fileSize)
+	return LoadSBOMFromReader(file)
 }
 
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
 // and returns the loaded SPDX document and the OCI descriptor.
-// The size parameter is the size of the document in bytes.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.Descriptor, []byte, error) {
+func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *oci.Descriptor, []byte, error) {
 	defer reader.Close()
 
-	// Read all the bytes from the reader into a slice
-	sbomBytes, err := readAllBytes(reader)
+	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -59,15 +52,6 @@ func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.
 
 	// Read the SPDX document from the reader
 	doc, err := json.Read(sbomReader)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	// Reset the reader for the next read
-	sbomReader.Reset(sbomBytes)
-
-	// Generate the OCI descriptor for the SPDX document
-	desc, err := getFileDescriptor(MEDIATYPE_SPDX, sbomReader, size)
 	if err != nil {
 		return nil, nil, nil, err
 	}
