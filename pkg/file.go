@@ -66,21 +66,10 @@ func getFileSize(file *os.File) (int64, error) {
 }
 
 func getFileDescriptor(mediaType string, reader io.Reader, size int64) (*oci.Descriptor, error) {
-	// Create a new SHA256 hasher
-	hasher := sha256.New()
-
-	// Copy the file's contents into the hasher
-	if _, err := io.Copy(hasher, reader); err != nil {
+	d, err := getDigestFromReader(reader)
+	if err != nil {
 		return nil, err
 	}
-
-	// Get the resulting hash as a byte slice
-	hash := hasher.Sum(nil)
-
-	// Convert the hash to a hexadecimal string
-	hashString := hex.EncodeToString(hash)
-
-	d := digest.NewDigestFromEncoded(digest.SHA256, hashString)
 
 	desc := &oci.Descriptor{
 		MediaType: mediaType,
@@ -89,6 +78,24 @@ func getFileDescriptor(mediaType string, reader io.Reader, size int64) (*oci.Des
 	}
 
 	return desc, nil
+}
+
+func getDigestFromReader(reader io.Reader) (digest.Digest, error) {
+	// Create a new SHA256 hasher
+	hasher := sha256.New()
+
+	// Copy the file's contents into the hasher
+	if _, err := io.Copy(hasher, reader); err != nil {
+		return digest.NewDigestFromBytes(digest.SHA256, make([]byte, 0)), err
+	}
+
+	// Get the resulting hash as a byte slice
+	hash := hasher.Sum(nil)
+
+	// Convert the hash to a hexadecimal string
+	hashString := hex.EncodeToString(hash)
+
+	return digest.NewDigestFromEncoded(digest.SHA256, hashString), nil
 }
 
 func readAllBytes(reader io.Reader) ([]byte, error) {

@@ -10,8 +10,10 @@ import (
 	obom "github.com/Azure/obom/pkg"
 	"github.com/spf13/cobra"
 	"oras.land/oras-go/v2/registry"
+	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/credentials"
+	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
 type pushOpts struct {
@@ -28,6 +30,7 @@ var (
 	errAnnotationFormat      = errors.New("missing key in `--annotation` flag")
 	errAnnotationDuplication = errors.New("duplicate annotation key")
 	errAttachArtifactFormat  = errors.New("missing key in `--attach` flag")
+	APPLICATION_USERAGENT    = "obom"
 )
 
 func pushCmd() *cobra.Command {
@@ -101,8 +104,14 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 				os.Exit(1)
 			}
 
+			repo, err := getRemoteRepoTarget(opts.reference, resolver)
+			if err != nil {
+				fmt.Println("Error getting remote repository:", err)
+				os.Exit(1)
+			}
+
 			fmt.Printf("Pushing SBOM to %s@%s...\n", opts.reference, desc.Digest)
-			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, resolver, opts.pushSummary)
+			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, opts.pushSummary, repo)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)
@@ -120,7 +129,7 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 							os.Exit(1)
 						}
 						fmt.Printf("Attaching artifact %s with artifactType %s...\n", path, artifactType)
-						_, err = obom.AttachArtifact(subject, artifactDesc, artifactType, artifactBytes, opts.reference, resolver)
+						_, err = obom.AttachArtifact(subject, artifactDesc, artifactType, artifactBytes, repo)
 						if err != nil {
 							fmt.Println("Error attaching artifact:", err)
 							os.Exit(1)
@@ -193,4 +202,41 @@ func getCredentialsResolver(registry string, username string, password string) (
 		}
 		return credentials.Credential(store), nil
 	}
+}
+
+func getRemoteRepoTarget(reference string, credsResolver obom.CredentialsResolver) (*remote.Repository, error) {
+	// Parse the reference
+	ref, err := registry.ParseReference(reference)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing reference: %w", err)
+	}
+
+	// Construct the repository string without the tag/digest
+	// This allows us to reuse this repository target for pushing the SBOM and attaching artifacts
+	repoStr := fmt.Sprintf("%s/%s", ref.Registry, ref.Repository)
+
+	// Connect to a remote repository
+	repo, err := remote.NewRepository(repoStr)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to remote repository: %w", err)
+	}
+
+	// Check if registry has is localhost or starts with localhost:
+	reg := repo.Reference.Registry
+	if strings.HasPrefix(reg, "localhost:") {
+		repo.PlainHTTP = true
+	}
+
+	// Prepare the auth client for the registry
+	client := &auth.Client{
+		Client: retry.DefaultClient,
+		Cache:  auth.DefaultCache,
+	}
+
+	client.Credential = credsResolver
+
+	client.SetUserAgent(APPLICATION_USERAGENT)
+	repo.Client = client
+
+	return repo, nil
 }
