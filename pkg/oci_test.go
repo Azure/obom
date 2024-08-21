@@ -67,3 +67,27 @@ func TestAttachArtifact_Success(t *testing.T) {
 		t.Errorf("expected manifest artifactType to be '%s', got: %v", testArtifactType, artifactManifest.ArtifactType)
 	}
 }
+
+func TestAttachArtifact_SubjectNotPresent(t *testing.T) {
+	// Create an in-memory target for testing
+	memDest := memory.New()
+
+	// Create a subject descriptor that does not exist in the memory store
+	subjectArtifactType := "application/spdx"
+	subjectDescriptor := getOCIDescriptor(subjectArtifactType, []byte(""))
+	testArtifact := "test signature"
+	testArtifactType := "application/cose"
+
+	// Create some artifact bytes
+	artifactBytes := []byte(testArtifact)
+
+	// Create an artifact descriptor
+	artifactDescriptor := getOCIDescriptor(testArtifactType, artifactBytes)
+	// Call the AttachArtifact function
+	_, err := AttachArtifact(subjectDescriptor, artifactDescriptor, testArtifactType, artifactBytes, memDest)
+
+	// Check that there was an error
+	if err == nil {
+		t.Fatalf("expected 'subject descriptor does not exist in dest' error, got no error")
+	}
+}
