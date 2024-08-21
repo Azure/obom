@@ -7,10 +7,10 @@ import (
 	"os"
 
 	"github.com/opencontainers/go-digest"
-	oci "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-func LoadArtifactFromFile(filename string, mediaType string) (*oci.Descriptor, []byte, error) {
+func LoadArtifactFromFile(filename string, mediaType string) (*ocispec.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading artifact from file: %w", err)
@@ -19,7 +19,7 @@ func LoadArtifactFromFile(filename string, mediaType string) (*oci.Descriptor, [
 	return LoadArtifactFromReader(file, mediaType)
 }
 
-func LoadArtifactFromReader(reader io.ReadCloser, mediaType string) (*oci.Descriptor, []byte, error) {
+func LoadArtifactFromReader(reader io.ReadCloser, mediaType string) (*ocispec.Descriptor, []byte, error) {
 	defer reader.Close()
 
 	// Read all the bytes from the reader into a slice
@@ -33,8 +33,8 @@ func LoadArtifactFromReader(reader io.ReadCloser, mediaType string) (*oci.Descri
 	return desc, artifactBytes, nil
 }
 
-func getOCIDescriptor(mediaType string, bytes []byte) *oci.Descriptor {
-	desc := &oci.Descriptor{
+func getOCIDescriptor(mediaType string, bytes []byte) *ocispec.Descriptor {
+	desc := &ocispec.Descriptor{
 		MediaType: mediaType,
 		Digest:    digest.FromBytes(bytes),
 		Size:      int64(len(bytes)),

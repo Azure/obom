@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/memory"
 )
@@ -51,7 +51,7 @@ func TestAttachArtifact_Success(t *testing.T) {
 		t.Fatalf("error fetching manifest from memory store: %v", err)
 	}
 	// Unmarshal the fetched manifest
-	var fetchedManifest v1.Manifest
+	var fetchedManifest ocispec.Manifest
 	decoder := json.NewDecoder(fetchedRc)
 	err = decoder.Decode(&fetchedManifest)
 	if err != nil {

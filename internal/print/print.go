@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	oci "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/spdx/tools-golang/spdx/v2/v2_3"
 )
 
@@ -23,7 +23,7 @@ func PrintCreatorInfo(doc *v2_3.Document) {
 }
 
 // PrintSBOMSummary returns the SPDX summary from the SBOM
-func PrintSBOMSummary(doc *v2_3.Document, desc *oci.Descriptor) {
+func PrintSBOMSummary(doc *v2_3.Document, desc *ocispec.Descriptor) {
 	fmt.Println(strings.Repeat("=", 80))
 	fmt.Printf("Document Name:         %s\n", doc.DocumentName)
 	fmt.Printf("Document Namespace:    %s\n", doc.DocumentNamespace)

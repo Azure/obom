@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	oci "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	purl "github.com/package-url/packageurl-go"
 	json "github.com/spdx/tools-golang/json"
 	"github.com/spdx/tools-golang/spdx/v2/common"
@@ -26,7 +26,7 @@ const (
 // LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
 // It also calculates the file size and generates an OCI descriptor for the file.
 // It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
-func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, []byte, error) {
+func LoadSBOMFromFile(filename string) (*v2_3.Document, *ocispec.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, nil, nil, err
@@ -39,7 +39,7 @@ func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, []byte,
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
 // and returns the loaded SPDX document and the OCI descriptor.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *oci.Descriptor, []byte, error) {
+func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *ocispec.Descriptor, []byte, error) {
 	defer reader.Close()
 
 	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX)
