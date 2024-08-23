@@ -7,6 +7,7 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2"
+	"oras.land/oras-go/v2/content"
 	"oras.land/oras-go/v2/content/memory"
 )
 
@@ -29,9 +30,9 @@ func TestAttachArtifact_Success(t *testing.T) {
 	artifactBytes := []byte(testArtifact)
 
 	// Create an artifact descriptor
-	artifactDescriptor := getOCIDescriptor(testArtifactType, artifactBytes)
+	artifactDescriptor := content.NewDescriptorFromBytes(testArtifactType, artifactBytes)
 	// Call the AttachArtifact function
-	artifactManifest, err := AttachArtifact(&subjectDescriptor, artifactDescriptor, testArtifactType, artifactBytes, memDest)
+	artifactManifest, err := AttachArtifact(&subjectDescriptor, &artifactDescriptor, testArtifactType, artifactBytes, memDest)
 
 	// Check that there was no error
 	if err != nil {
@@ -74,7 +75,7 @@ func TestAttachArtifact_SubjectNotPresent(t *testing.T) {
 
 	// Create a subject descriptor that does not exist in the memory store
 	subjectArtifactType := "application/spdx"
-	subjectDescriptor := getOCIDescriptor(subjectArtifactType, []byte(""))
+	subjectDescriptor := content.NewDescriptorFromBytes(subjectArtifactType, []byte(""))
 	testArtifact := "test signature"
 	testArtifactType := "application/cose"
 
@@ -82,9 +83,9 @@ func TestAttachArtifact_SubjectNotPresent(t *testing.T) {
 	artifactBytes := []byte(testArtifact)
 
 	// Create an artifact descriptor
-	artifactDescriptor := getOCIDescriptor(testArtifactType, artifactBytes)
+	artifactDescriptor := content.NewDescriptorFromBytes(testArtifactType, artifactBytes)
 	// Call the AttachArtifact function
-	_, err := AttachArtifact(subjectDescriptor, artifactDescriptor, testArtifactType, artifactBytes, memDest)
+	_, err := AttachArtifact(&subjectDescriptor, &artifactDescriptor, testArtifactType, artifactBytes, memDest)
 
 	// Check that there was an error
 	if err == nil {
