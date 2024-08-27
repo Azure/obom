@@ -111,33 +111,12 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 			}
 
 			fmt.Printf("Pushing SBOM to %s@%s...\n", opts.reference, desc.Digest)
-			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, opts.pushSummary, repo)
+			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, opts.pushSummary, attachArtifacts, repo)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)
 			}
 			fmt.Printf("SBOM pushed to %s@%s\n", opts.reference, subject.Digest)
-
-			// attach artifacts if any
-			if len(attachArtifacts) > 0 {
-				for artifactType, paths := range attachArtifacts {
-					for _, path := range paths {
-						// load the artifact from the path
-						artifactDesc, artifactBytes, err := obom.LoadArtifactFromFile(path, artifactType)
-						if err != nil {
-							fmt.Println("Error loading artifact:", err)
-							os.Exit(1)
-						}
-						fmt.Printf("Attaching artifact %s with artifactType %s...\n", path, artifactType)
-						_, err = obom.AttachArtifact(subject, artifactDesc, artifactType, artifactBytes, repo)
-						if err != nil {
-							fmt.Println("Error attaching artifact:", err)
-							os.Exit(1)
-						}
-						fmt.Printf("Artifact attached at %s@%s\n", opts.reference, subject.Digest)
-					}
-				}
-			}
 		},
 	}
 

@@ -25,7 +25,7 @@ type CredentialsResolver = func(context.Context, string) (auth.Credential, error
 // PushSBOM pushes the SPDX SBOM bytes to the registry as an OCI artifact.
 // It takes in a pointer to an SPDX document, a pointer to a descriptor, a byte slice of the SBOM, a reference string, a map of SPDX annotations, and a credentials resolver function.
 // It returns an error if there was an issue pushing the SBOM to the registry.
-func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, pushSummary bool, dest oras.Target) (*v1.Descriptor, error) {
+func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes []byte, reference string, spdx_annotations map[string]string, pushSummary bool, attachArtifacts map[string][]string, dest oras.Target) (*v1.Descriptor, error) {
 	mem := memory.New()
 	ctx := context.Background()
 
@@ -89,48 +89,47 @@ func PushSBOM(sbomDoc *v2_3.Document, sbomDescriptor *v1.Descriptor, sbomBytes [
 		return nil, err
 	}
 
+	if len(attachArtifacts) > 0 {
+		for artifactType, paths := range attachArtifacts {
+			for _, path := range paths {
+				// load the artifact from the path
+				artifactDesc, artifactBytes, err := LoadArtifactFromFile(path, artifactType)
+				if err != nil {
+					return nil, fmt.Errorf("error loading artifact: %v", err)
+				}
+				err = AttachArtifact(ctx, &manifestDescriptor, artifactDesc, artifactType, artifactBytes, mem)
+				if err != nil {
+					return nil, fmt.Errorf("error attaching artifact: %v", err)
+				}
+			}
+		}
+	}
+
 	// Copy from the memory store to the remote repository
-	manifest, err := oras.Copy(ctx, mem, tag, dest, tag, oras.DefaultCopyOptions)
+	manifest, err := oras.ExtendedCopy(ctx, mem, tag, dest, tag, oras.DefaultExtendedCopyOptions)
 	return &manifest, err
 }
 
 // AttachArtifact attaches an artifact to the subject descriptor
-func AttachArtifact(subject *v1.Descriptor, artifactDescriptor *v1.Descriptor, artifactType string, artifactBytes []byte, dest oras.Target) (*v1.Descriptor, error) {
-	ctx := context.Background()
-
-	exists, err := dest.Exists(ctx, *subject)
-	if err != nil {
-		return nil, fmt.Errorf("error checking if subject exists in dest: %w", err)
-	}
-	if !exists {
-		return nil, fmt.Errorf("subject descriptor does not exist in dest")
-	}
-
+func AttachArtifact(ctx context.Context, subject *v1.Descriptor, artifactDescriptor *v1.Descriptor, artifactType string, artifactBytes []byte, mem *memory.Store) error {
 	// Create a Reader for the bytes
 	artifactReader := bytes.NewReader(artifactBytes)
 
 	// Add descriptor to a memory store
-	mem := memory.New()
-	err = mem.Push(ctx, *artifactDescriptor, artifactReader)
+	err := mem.Push(ctx, *artifactDescriptor, artifactReader)
 	if err != nil {
-		return nil, fmt.Errorf("error pushing artifact into memory store: %w", err)
+		return fmt.Errorf("error pushing artifact into memory store: %w", err)
 	}
 
 	// Pack the artifact manifest with the subject descriptor
-	artifactManifestDescriptor, err := oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1, artifactType, oras.PackManifestOptions{
+	_, err = oras.PackManifest(ctx, mem, oras.PackManifestVersion1_1, artifactType, oras.PackManifestOptions{
 		Subject: subject,
 		Layers:  []v1.Descriptor{*artifactDescriptor},
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("error packing artifact manifest: %w", err)
+		return fmt.Errorf("error packing artifact manifest: %w", err)
 	}
 
-	// Tag the artifact manifest with the artifact digest
-	if err = mem.Tag(ctx, artifactManifestDescriptor, artifactManifestDescriptor.Digest.String()); err != nil {
-		return nil, fmt.Errorf("error tagging artifact: %w", err)
-	}
-
-	manifest, err := oras.Copy(ctx, mem, artifactManifestDescriptor.Digest.String(), dest, artifactManifestDescriptor.Digest.String(), oras.DefaultCopyOptions)
-	return &manifest, err
+	return nil
 }
