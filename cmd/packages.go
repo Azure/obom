@@ -25,7 +25,7 @@ func packagesCmd() *cobra.Command {
 				os.Exit(1)
 			}
 
-			packages, err := obom.GetPackages(sbom)
+			packages, err := obom.GetPackages(sbom.Document)
 			if err != nil {
 				fmt.Println("Error getting packages:", err)
 				os.Exit(1)

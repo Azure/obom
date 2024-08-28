@@ -111,7 +111,7 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 			}
 
 			fmt.Printf("Pushing SBOM to %s@%s...\n", opts.reference, desc.Digest)
-			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, opts.pushSummary, attachArtifacts, repo)
+			subject, err := obom.PushSBOM(sbom.Document, desc, bytes, opts.reference, annotations, opts.pushSummary, attachArtifacts, repo)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)

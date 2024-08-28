@@ -2,6 +2,7 @@ package obom
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -9,8 +10,8 @@ import (
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	purl "github.com/package-url/packageurl-go"
-	json "github.com/spdx/tools-golang/json"
-	"github.com/spdx/tools-golang/spdx/v2/common"
+	spdxjson "github.com/spdx/tools-golang/json"
+	v2common "github.com/spdx/tools-golang/spdx/v2/common"
 	"github.com/spdx/tools-golang/spdx/v2/v2_3"
 )
 
@@ -23,10 +24,16 @@ const (
 	OCI_ANNOTATION_CREATORS           = "org.spdx.creator"
 )
 
+type SPDXDocument struct {
+	// SPDXVersion is the version of the SPDX specification used in the document
+	SPDXVersion string         `json:"spdxVersion"`
+	Document    *v2_3.Document `json:"document"`
+}
+
 // LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
 // It also calculates the file size and generates an OCI descriptor for the file.
 // It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
-func LoadSBOMFromFile(filename string) (*v2_3.Document, *ocispec.Descriptor, []byte, error) {
+func LoadSBOMFromFile(filename string) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, nil, nil, err
@@ -39,7 +46,7 @@ func LoadSBOMFromFile(filename string) (*v2_3.Document, *ocispec.Descriptor, []b
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
 // and returns the loaded SPDX document and the OCI descriptor.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *ocispec.Descriptor, []byte, error) {
+func LoadSBOMFromReader(reader io.ReadCloser) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
 	defer reader.Close()
 
 	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX)
@@ -47,11 +54,7 @@ func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *ocispec.Descript
 		return nil, nil, nil, err
 	}
 
-	// Create a bytes.Reader from the slice
-	sbomReader := bytes.NewReader(sbomBytes)
-
-	// Read the SPDX document from the reader
-	doc, err := json.Read(sbomReader)
+	doc, err := getSPDXDocumentFromSBOMBytes(sbomBytes)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -59,18 +62,41 @@ func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *ocispec.Descript
 	return doc, desc, sbomBytes, nil
 }
 
+func getSPDXDocumentFromSBOMBytes(sbomBytes []byte) (*SPDXDocument, error) {
+	var jsonDoc map[string]interface{}
+	err := json.Unmarshal(sbomBytes, &jsonDoc)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling SBOM bytes: %w", err)
+	}
+
+	version, ok := jsonDoc["spdxVersion"].(string)
+	if !ok {
+		return nil, fmt.Errorf("SBOM does not contain spdxVersion field")
+	}
+
+	sbomReader := bytes.NewReader(sbomBytes)
+	doc, err := spdxjson.Read(sbomReader)
+	if err != nil {
+		return nil, fmt.Errorf("error reading SPDX document: %w", err)
+	}
+
+	return &SPDXDocument{SPDXVersion: version, Document: doc}, nil
+}
+
 // GetAnnotations returns the annotations from the SBOM
-func GetAnnotations(sbom *v2_3.Document) (map[string]string, error) {
+func GetAnnotations(sbomDoc *SPDXDocument) (map[string]string, error) {
+	sbom := sbomDoc.Document
+	version := sbomDoc.SPDXVersion
 	var creatorstrings []string
 	for _, creator := range sbom.CreationInfo.Creators {
-		creatorstrings = append(creatorstrings, fmt.Sprint(creator.Creator))
+		creatorstrings = append(creatorstrings, fmt.Sprintf("%s: %s", creator.CreatorType, creator.Creator))
 	}
 
 	annotations := make(map[string]string)
 
 	annotations[OCI_ANNOTATION_DOCUMENT_NAME] = sbom.DocumentName
 	annotations[OCI_ANNOTATION_DOCUMENT_NAMESPACE] = sbom.DocumentNamespace
-	annotations[OCI_ANNOTATION_SPDX_VERSION] = sbom.SPDXVersion
+	annotations[OCI_ANNOTATION_SPDX_VERSION] = version
 	annotations[OCI_ANNOTATION_CREATION_DATE] = sbom.CreationInfo.Created
 	annotations[OCI_ANNOTATION_CREATORS] = strings.Join(creatorstrings, ", ")
 
@@ -132,7 +158,7 @@ func GetPackageSummary(pkg *v2_3.Package) (*PackageSummary, error) {
 
 func GetPackageManager(externalReferences []*v2_3.PackageExternalReference) (string, error) {
 	for _, exRef := range externalReferences {
-		if exRef.Category == common.CategoryPackageManager && exRef.RefType == common.TypePackageManagerPURL {
+		if exRef.Category == v2common.CategoryPackageManager && exRef.RefType == v2common.TypePackageManagerPURL {
 			packageUrl, err := purl.FromString(exRef.Locator)
 			if err != nil {
 				return "", fmt.Errorf("error parsing package url for %s: %v", exRef.Locator, err)

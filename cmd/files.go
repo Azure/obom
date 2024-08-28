@@ -28,7 +28,7 @@ Example:
 				os.Exit(1)
 			}
 
-			files, err := obom.GetFiles(sbom)
+			files, err := obom.GetFiles(sbom.Document)
 			if err != nil {
 				fmt.Println("Error getting files:", err)
 				os.Exit(1)
