@@ -29,15 +29,15 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdxStr))
 
 	// Call the function with the test reader
-	sbomDoc, desc, sbomBytes, err := LoadSBOMFromReader(reader)
+	sbomDoc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if sbomDoc.SPDXVersion != "SPDX-2.2" {
-		t.Errorf("expected SPDXVersion to be 'SPDX-2.2', got: %v", sbomDoc.SPDXVersion)
+	if sbomDoc.Version != "SPDX-2.2" {
+		t.Errorf("expected SPDXVersion to be 'SPDX-2.2', got: %v", sbomDoc.Version)
 	}
 
 	doc := sbomDoc.Document
@@ -60,15 +60,15 @@ func TestLoadSBOMFromFile(t *testing.T) {
 	size := int64(21342)
 
 	// Call the function with the test file path
-	sbomDoc, desc, _, err := LoadSBOMFromFile(filePath)
+	sbomDoc, desc, _, err := LoadSBOMFromFile(filePath, true)
 
 	// Check that there was no error
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	if sbomDoc.SPDXVersion != "SPDX-2.3" {
-		t.Errorf("expected SPDXVersion to be 'SPDX-2.3', got: %v", sbomDoc.SPDXVersion)
+	if sbomDoc.Version != "SPDX-2.3" {
+		t.Errorf("expected SPDXVersion to be 'SPDX-2.3', got: %v", sbomDoc.Version)
 	}
 
 	doc := sbomDoc.Document
@@ -89,7 +89,7 @@ func TestGetAnnotations(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdxStr))
 
 	// Call the function with the test reader
-	sbomDoc, _, _, err := LoadSBOMFromReader(reader)
+	sbomDoc, _, _, err := LoadSBOMFromReader(reader, true)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

@@ -21,6 +21,7 @@ type pushOpts struct {
 	reference           string
 	username            string
 	password            string
+	strict              bool
 	pushSummary         bool
 	ManifestAnnotations []string
 	attachArtifacts     []string
@@ -78,7 +79,7 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 				os.Exit(1)
 			}
 
-			sbom, desc, bytes, err := obom.LoadSBOMFromFile(opts.filename)
+			sbom, desc, bytes, err := obom.LoadSBOMFromFile(opts.filename, opts.strict)
 			if err != nil {
 				fmt.Println("Error loading SBOM:", err)
 				os.Exit(1)
@@ -128,6 +129,7 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 	pushCmd.Flags().StringVarP(&opts.username, "username", "u", "", "Username for the registry")
 	pushCmd.Flags().StringVarP(&opts.password, "password", "p", "", "Password for the registry")
 	pushCmd.Flags().BoolVarP(&opts.pushSummary, "pushSummary", "s", false, "Push summary blob to the registry")
+	pushCmd.Flags().BoolVarP(&opts.strict, "strict", "r", true, "Enable strict SPDX parsing as per the SPDX specification. Set --strict=false to fallback to simple JSON parsing strategy")
 	pushCmd.Flags().StringArrayVarP(&opts.attachArtifacts, "attach", "t", nil, "Attach artifacts to the SBOM")
 
 	// Add positional argument called reference to pushCmd

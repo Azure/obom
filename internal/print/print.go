@@ -29,11 +29,17 @@ func PrintSBOMSummary(sbomDoc *obom.SPDXDocument, desc *ocispec.Descriptor) {
 	fmt.Println(strings.Repeat("=", 80))
 	fmt.Printf("Document Name:         %s\n", doc.DocumentName)
 	fmt.Printf("Document Namespace:    %s\n", doc.DocumentNamespace)
-	fmt.Printf("SPDX Version:          %s\n", sbomDoc.SPDXVersion)
-	fmt.Printf("Creation Date:         %s\n", doc.CreationInfo.Created)
-	PrintCreatorInfo(doc)
-	fmt.Printf("Packages:              %d\n", len(doc.Packages))
-	fmt.Printf("Files:                 %d\n", len(doc.Files))
+	fmt.Printf("SPDX Version:          %s\n", sbomDoc.Version)
+	if doc.CreationInfo != nil {
+		fmt.Printf("Creation Date:         %s\n", doc.CreationInfo.Created)
+		PrintCreatorInfo(doc)
+	}
+	if doc.Packages != nil {
+		fmt.Printf("Packages:              %d\n", len(doc.Packages))
+	}
+	if doc.Files != nil {
+		fmt.Printf("Files:                 %d\n", len(doc.Files))
+	}
 	fmt.Printf("Digest:                %s\n", desc.Digest)
 	fmt.Println(strings.Repeat("=", 80))
 }
