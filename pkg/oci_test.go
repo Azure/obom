@@ -1,83 +1,158 @@
 package obom
 
-// func TestAttachArtifact_Success(t *testing.T) {
-// 	// Create an in-memory target for testing
-// 	memDest := memory.New()
-// 	ctx := context.Background()
+import (
+	"context"
+	"encoding/json"
+	"io"
+	"strings"
+	"testing"
 
-// 	// Create a subject descriptor
-// 	subjectArtifactType := "application/spdx"
-// 	subjectDescriptor, err := oras.PackManifest(ctx, memDest, oras.PackManifestVersion1_1, subjectArtifactType, oras.PackManifestOptions{})
-// 	if err != nil {
-// 		t.Fatalf("error creating subject descriptor: %v", err)
-// 	}
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"oras.land/oras-go/v2/content/memory"
+	"oras.land/oras-go/v2/registry"
+)
 
-// 	testArtifact := "test signature"
-// 	testArtifactType := "application/cose"
+func TestPushSBOM_Success_NoAttachArtifacts(t *testing.T) {
+	// Create an in-memory target for testing
+	memDest := memory.New()
 
-// 	// Create some artifact bytes
-// 	artifactBytes := []byte(testArtifact)
+	// Create a test SPDX document
+	spdx := `{
+		"SPDXID": "SPDXRef-DOCUMENT",
+		"spdxVersion": "SPDX-2.3",
+		"name" : "SPDX-Example",
+		"creationInfo": {
+				"created": "2020-07-23T18:30:22Z",
+				"creators": ["Tool: SPDX-Java-Tools-v2.1.20", "Organization: Source Auditor Inc."],
+				"licenseListVersion": "3.6"
+		}
+	}`
+	reader := io.NopCloser(strings.NewReader(spdx))
 
-// 	// Create an artifact descriptor
-// 	artifactDescriptor := content.NewDescriptorFromBytes(testArtifactType, artifactBytes)
-// 	// Call the AttachArtifact function
-// 	artifactManifest, err := AttachArtifact(&subjectDescriptor, &artifactDescriptor, testArtifactType, artifactBytes, memDest)
+	// Load the SPDX document from the reader
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader)
 
-// 	// Check that there was no error
-// 	if err != nil {
-// 		t.Fatalf("expected no error, got: %v", err)
-// 	}
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error from LoadSBOMFromReader, got: %v", err)
+	}
 
-// 	exists, err := memDest.Exists(ctx, *artifactManifest)
-// 	if err != nil {
-// 		t.Fatalf("error checking if manifest exists: %v", err)
-// 	}
-// 	if !exists {
-// 		t.Errorf("expected manifest to exist in memory store")
-// 	}
+	annotations, err := GetAnnotations(doc)
+	if err != nil {
+		t.Fatalf("expected no error from GetAnnotations, got: %v", err)
+	}
 
-// 	fetchedRc, err := memDest.Fetch(ctx, *artifactManifest)
-// 	if err != nil {
-// 		t.Fatalf("error fetching manifest from memory store: %v", err)
-// 	}
-// 	// Unmarshal the fetched manifest
-// 	var fetchedManifest ocispec.Manifest
-// 	decoder := json.NewDecoder(fetchedRc)
-// 	err = decoder.Decode(&fetchedManifest)
-// 	if err != nil {
-// 		t.Fatalf("error decoding fetched manifest: %v", err)
-// 	}
+	// Call the PushSBOM function
+	sbomDesc, err := PushSBOM(doc, desc, sbomBytes, "localhost:5000/spdx:latest", annotations, false, nil, memDest)
+	if err != nil {
+		t.Fatalf("expected no error from PushSBOM, got: %v", err)
+	}
 
-// 	if fetchedManifest.Subject.Digest != subjectDescriptor.Digest {
-// 		t.Errorf("expected fetched manifest subject digest to be %v, got: %v", subjectDescriptor.Digest, fetchedManifest.Subject.Digest)
-// 	}
+	// Check that the returned descriptor has the expected digest
+	if sbomDesc.Digest == "" {
+		t.Errorf("expected descriptor digest to be set, got empty string")
+	}
 
-// 	// Check that the returned manifest has the expected artifactType
-// 	if artifactManifest.ArtifactType != testArtifactType {
-// 		t.Errorf("expected manifest artifactType to be '%s', got: %v", testArtifactType, artifactManifest.ArtifactType)
-// 	}
-// }
+	ctx := context.Background()
+	exists, err := memDest.Exists(ctx, *sbomDesc)
+	if err != nil {
+		t.Fatalf("error checking if sbom manifest exists: %v", err)
+	}
+	if !exists {
+		t.Errorf("expected manifest to exist in memory store")
+	}
 
-// func TestAttachArtifact_SubjectNotPresent(t *testing.T) {
-// 	// Create an in-memory target for testing
-// 	memDest := memory.New()
+	fetchedRc, err := memDest.Fetch(ctx, *sbomDesc)
+	if err != nil {
+		t.Fatalf("error fetching sbom manifest from memory store: %v", err)
+	}
 
-// 	// Create a subject descriptor that does not exist in the memory store
-// 	subjectArtifactType := "application/spdx"
-// 	subjectDescriptor := content.NewDescriptorFromBytes(subjectArtifactType, []byte(""))
-// 	testArtifact := "test signature"
-// 	testArtifactType := "application/cose"
+	var fetchedManifest ocispec.Manifest
+	decoder := json.NewDecoder(fetchedRc)
+	err = decoder.Decode(&fetchedManifest)
+	if err != nil {
+		t.Fatalf("error decoding fetched manifest: %v", err)
+	}
 
-// 	// Create some artifact bytes
-// 	artifactBytes := []byte(testArtifact)
+	// Check that the fetched manifest has the expected annotations
+	if len(fetchedManifest.Annotations) != len(annotations) {
+		t.Errorf("expected %d annotations, got: %d", len(annotations), len(fetchedManifest.Annotations))
+	}
+	if fetchedManifest.Annotations[OCI_ANNOTATION_DOCUMENT_NAME] != "SPDX-Example" {
+		t.Errorf("expected annotation %s to be 'SPDX-Example', got: %v", OCI_ANNOTATION_DOCUMENT_NAME, fetchedManifest.Annotations[OCI_ANNOTATION_DOCUMENT_NAME])
+	}
+	if fetchedManifest.Annotations[OCI_ANNOTATION_SPDX_VERSION] != "SPDX-2.3" {
+		t.Errorf("expected annotation %s version to be 'SPDX-2.3', got: %v", OCI_ANNOTATION_SPDX_VERSION, fetchedManifest.Annotations[OCI_ANNOTATION_SPDX_VERSION])
+	}
+	if fetchedManifest.Annotations[OCI_ANNOTATION_CREATION_DATE] != "2020-07-23T18:30:22Z" {
+		t.Errorf("expected annotation %s to be '2020-07-23T18:30:22Z', got: %v", OCI_ANNOTATION_SPDX_VERSION, fetchedManifest.Annotations[OCI_ANNOTATION_SPDX_VERSION])
+	}
 
-// 	// Create an artifact descriptor
-// 	artifactDescriptor := content.NewDescriptorFromBytes(testArtifactType, artifactBytes)
-// 	// Call the AttachArtifact function
-// 	_, err := AttachArtifact(&subjectDescriptor, &artifactDescriptor, testArtifactType, artifactBytes, memDest)
+	// Check that the returned descriptor has the expected digest
+	if sbomDesc.Digest == "" {
+		t.Errorf("expected descriptor digest to be set, got empty string")
+	}
 
-// 	// Check that there was an error
-// 	if err == nil {
-// 		t.Fatalf("expected 'subject descriptor does not exist in dest' error, got no error")
-// 	}
-// }
+	if sbomDesc.ArtifactType != MEDIATYPE_SPDX {
+		t.Errorf("expected descriptor artifactType to be %s, got: %s", MEDIATYPE_SPDX, sbomDesc.ArtifactType)
+	}
+}
+
+func TestPushSBOM_Success_WithAttachArtifacts(t *testing.T) {
+	// Create an in-memory target for testing
+	memDest := memory.New()
+
+	// Create a test SPDX document
+	spdx := `{
+		"SPDXID": "SPDXRef-DOCUMENT",
+		"spdxVersion": "SPDX-2.3",
+		"name" : "SPDX-Example",
+		"creationInfo": {
+				"created": "2020-07-23T18:30:22Z",
+				"creators": ["Tool: SPDX-Java-Tools-v2.1.20", "Organization: Source Auditor Inc."],
+				"licenseListVersion": "3.6"
+		}
+	}`
+	reader := io.NopCloser(strings.NewReader(spdx))
+
+	// Load the SPDX document from the reader
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error from LoadSBOMFromReader, got: %v", err)
+	}
+
+	attachArtifacts := map[string][]string{
+		"application/json": {"../examples/artifact.example.json"},
+		"application/yaml": {"../examples/artifact.example.yaml"},
+	}
+
+	// Call the PushSBOM function
+	sbomDesc, err := PushSBOM(doc, desc, sbomBytes, "localhost:5000/spdx:latest", nil, false, attachArtifacts, memDest)
+	if err != nil {
+		t.Fatalf("expected no error from PushSBOM, got: %v", err)
+	}
+
+	// Check that the returned descriptor has the expected digest
+	if sbomDesc.Digest == "" {
+		t.Errorf("expected descriptor digest to be set, got empty string")
+	}
+
+	// Check that the sbom manifest has the expected referrer artifacts
+	ctx := context.Background()
+	referrers, err := registry.Referrers(ctx, memDest, *sbomDesc, "")
+	if err != nil {
+		t.Fatalf("error getting referrers: %v", err)
+	}
+
+	if len(referrers) != 2 {
+		t.Errorf("expected 2 referrer artifacts, got: %d", len(referrers))
+	}
+
+	for _, referrer := range referrers {
+		if referrer.ArtifactType != "application/json" && referrer.ArtifactType != "application/yaml" {
+			t.Errorf("expected referrer artifactType to be 'application/json' or 'application/yaml', got: %s", referrer.ArtifactType)
+		}
+	}
+}
