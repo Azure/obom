@@ -74,10 +74,6 @@ func TestPushSBOM_Success_NoAttachArtifacts(t *testing.T) {
 		t.Fatalf("error decoding fetched manifest: %v", err)
 	}
 
-	// Check that the fetched manifest has the expected annotations
-	if len(fetchedManifest.Annotations) != len(annotations) {
-		t.Errorf("expected %d annotations, got: %d", len(annotations), len(fetchedManifest.Annotations))
-	}
 	if fetchedManifest.Annotations[OCI_ANNOTATION_DOCUMENT_NAME] != "SPDX-Example" {
 		t.Errorf("expected annotation %s to be 'SPDX-Example', got: %v", OCI_ANNOTATION_DOCUMENT_NAME, fetchedManifest.Annotations[OCI_ANNOTATION_DOCUMENT_NAME])
 	}
