@@ -2,15 +2,12 @@ package obom
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
-	"github.com/opencontainers/go-digest"
-	oci "github.com/opencontainers/image-spec/specs-go/v1"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	purl "github.com/package-url/packageurl-go"
 	json "github.com/spdx/tools-golang/json"
 	"github.com/spdx/tools-golang/spdx/v2/common"
@@ -29,30 +26,23 @@ const (
 // LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
 // It also calculates the file size and generates an OCI descriptor for the file.
 // It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
-func LoadSBOMFromFile(filename string) (*v2_3.Document, *oci.Descriptor, []byte, error) {
+func LoadSBOMFromFile(filename string) (*v2_3.Document, *ocispec.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	defer file.Close()
 
-	fileSize, err := getFileSize(file)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return LoadSBOMFromReader(file, fileSize)
+	return LoadSBOMFromReader(file)
 }
 
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
 // and returns the loaded SPDX document and the OCI descriptor.
-// The size parameter is the size of the document in bytes.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.Descriptor, []byte, error) {
+func LoadSBOMFromReader(reader io.ReadCloser) (*v2_3.Document, *ocispec.Descriptor, []byte, error) {
 	defer reader.Close()
 
-	// Read all the bytes from the reader into a slice
-	sbomBytes, err := readAllBytes(reader)
+	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -66,61 +56,7 @@ func LoadSBOMFromReader(reader io.ReadCloser, size int64) (*v2_3.Document, *oci.
 		return nil, nil, nil, err
 	}
 
-	// Reset the reader for the next read
-	sbomReader.Reset(sbomBytes)
-
-	// Generate the OCI descriptor for the SPDX document
-	desc, err := getFileDescriptor(sbomReader, size)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	return doc, desc, sbomBytes, nil
-}
-
-func getFileDescriptor(reader io.Reader, size int64) (*oci.Descriptor, error) {
-	// Create a new SHA256 hasher
-	hasher := sha256.New()
-
-	// Copy the file's contents into the hasher
-	if _, err := io.Copy(hasher, reader); err != nil {
-		return nil, err
-	}
-
-	// Get the resulting hash as a byte slice
-	hash := hasher.Sum(nil)
-
-	// Convert the hash to a hexadecimal string
-	hashString := hex.EncodeToString(hash)
-
-	d := digest.NewDigestFromHex("sha256", hashString)
-
-	desc := &oci.Descriptor{
-		MediaType: MEDIATYPE_SPDX,
-		Digest:    d,
-		Size:      size,
-	}
-
-	return desc, nil
-}
-
-func getFileSize(file *os.File) (int64, error) {
-	// Get the file size
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	return fileInfo.Size(), nil
-}
-
-func readAllBytes(reader io.Reader) ([]byte, error) {
-	var buf bytes.Buffer
-	_, err := io.Copy(&buf, reader)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 // GetAnnotations returns the annotations from the SBOM

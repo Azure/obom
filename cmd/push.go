@@ -10,8 +10,10 @@ import (
 	obom "github.com/Azure/obom/pkg"
 	"github.com/spf13/cobra"
 	"oras.land/oras-go/v2/registry"
+	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/credentials"
+	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
 type pushOpts struct {
@@ -21,11 +23,14 @@ type pushOpts struct {
 	password            string
 	pushSummary         bool
 	ManifestAnnotations []string
+	attachArtifacts     []string
 }
 
 var (
 	errAnnotationFormat      = errors.New("missing key in `--annotation` flag")
 	errAnnotationDuplication = errors.New("duplicate annotation key")
+	errAttachArtifactFormat  = errors.New("missing key in `--attach` flag")
+	APPLICATION_USERAGENT    = "obom"
 )
 
 func pushCmd() *cobra.Command {
@@ -43,6 +48,9 @@ Example - Push an SPDX SBOM to a registry with annotations
 
 Example - Push an SPDX SBOM to a registry with annotations and credentials
 	obom push -f spdx.json localhost:5000/spdx:latest --annotation key1=value1 --annotation key2=value2 --username user --password pass
+
+Example - Push an SPDX SBOM to a registry with attached artifacts where the key is the artifactType and the value is the path to the artifact
+	obom push -f spdx.json localhost:5000/spdx:latest --attach vnd.example.artifactType=/path/to/artifact --attach vnd.example.artifactType=/path/to/artifact2
 `,
 		Run: func(cmd *cobra.Command, args []string) {
 
@@ -53,6 +61,20 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 			ref, err := registry.ParseReference(opts.reference)
 			if err != nil {
 				fmt.Println("Error parsing reference:", err)
+				os.Exit(1)
+			}
+
+			// parse the annotations from the flags
+			inputAnnotations, err := parseAnnotationFlags(opts.ManifestAnnotations)
+			if err != nil {
+				fmt.Println("Error parsing annotations:", err)
+				os.Exit(1)
+			}
+
+			// parse the attach artifacts from the flags
+			attachArtifacts, err := parseAttachArtifactFlags(opts.attachArtifacts)
+			if err != nil {
+				fmt.Println("Error parsing attach artifacts:", err)
 				os.Exit(1)
 			}
 
@@ -70,12 +92,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				os.Exit(1)
 			}
 
-			// parse the annotations from the flags and merge with annotations from the SBOM
-			inputAnnotations, err := parseAnnotationFlags(opts.ManifestAnnotations)
-			if err != nil {
-				fmt.Println("Error parsing annotations:", err)
-				os.Exit(1)
-			}
+			// merge the input annotations with the annotations from the SBOM
 			for k, v := range inputAnnotations {
 				annotations[k] = v
 			}
@@ -87,11 +104,19 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 				os.Exit(1)
 			}
 
-			err = obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, resolver, opts.pushSummary)
+			repo, err := getRemoteRepoTarget(opts.reference, resolver)
+			if err != nil {
+				fmt.Println("Error getting remote repository:", err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("Pushing SBOM to %s@%s...\n", opts.reference, desc.Digest)
+			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, opts.pushSummary, attachArtifacts, repo)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)
 			}
+			fmt.Printf("SBOM pushed to %s@%s\n", opts.reference, subject.Digest)
 		},
 	}
 
@@ -103,6 +128,7 @@ Example - Push an SPDX SBOM to a registry with annotations and credentials
 	pushCmd.Flags().StringVarP(&opts.username, "username", "u", "", "Username for the registry")
 	pushCmd.Flags().StringVarP(&opts.password, "password", "p", "", "Password for the registry")
 	pushCmd.Flags().BoolVarP(&opts.pushSummary, "pushSummary", "s", false, "Push summary blob to the registry")
+	pushCmd.Flags().StringArrayVarP(&opts.attachArtifacts, "attach", "t", nil, "Attach artifacts to the SBOM")
 
 	// Add positional argument called reference to pushCmd
 	pushCmd.Args = cobra.ExactArgs(1)
@@ -125,6 +151,18 @@ func parseAnnotationFlags(flags []string) (map[string]string, error) {
 	return manifestAnnotations, nil
 }
 
+func parseAttachArtifactFlags(flags []string) (map[string][]string, error) {
+	attachArtifacts := make(map[string][]string)
+	for _, attach := range flags {
+		key, val, success := strings.Cut(attach, "=")
+		if !success {
+			return nil, fmt.Errorf("%w: %s", errAttachArtifactFormat, attach)
+		}
+		attachArtifacts[key] = append(attachArtifacts[key], val)
+	}
+	return attachArtifacts, nil
+}
+
 func getCredentialsResolver(registry string, username string, password string) (obom.CredentialsResolver, error) {
 	if len(username) != 0 && len(password) != 0 {
 		return auth.StaticCredential(registry, auth.Credential{
@@ -139,4 +177,41 @@ func getCredentialsResolver(registry string, username string, password string) (
 		}
 		return credentials.Credential(store), nil
 	}
+}
+
+func getRemoteRepoTarget(reference string, credsResolver obom.CredentialsResolver) (*remote.Repository, error) {
+	// Parse the reference
+	ref, err := registry.ParseReference(reference)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing reference: %w", err)
+	}
+
+	// Construct the repository string without the tag/digest
+	// This allows us to reuse this repository target for pushing the SBOM and attaching artifacts
+	repoStr := fmt.Sprintf("%s/%s", ref.Registry, ref.Repository)
+
+	// Connect to a remote repository
+	repo, err := remote.NewRepository(repoStr)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to remote repository: %w", err)
+	}
+
+	// Check if registry has is localhost or starts with localhost:
+	reg := repo.Reference.Registry
+	if strings.HasPrefix(reg, "localhost:") {
+		repo.PlainHTTP = true
+	}
+
+	// Prepare the auth client for the registry
+	client := &auth.Client{
+		Client: retry.DefaultClient,
+		Cache:  auth.DefaultCache,
+	}
+
+	client.Credential = credsResolver
+
+	client.SetUserAgent(APPLICATION_USERAGENT)
+	repo.Client = client
+
+	return repo, nil
 }

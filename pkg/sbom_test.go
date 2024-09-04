@@ -28,7 +28,7 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Call the function with the test reader
-	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, size)
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader)
 
 	// Check that there was no error
 	if err != nil {
@@ -67,5 +67,8 @@ func TestLoadSBOMFromFile(t *testing.T) {
 	}
 	if desc.Size != size {
 		t.Errorf("expected desc.Size to be %v, got: %v", size, desc.Size)
+	}
+	if desc.Digest.String() != "sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f" {
+		t.Errorf("expected desc.Digest to be 'sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f', got: %v", desc.Digest.String())
 	}
 }

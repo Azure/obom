@@ -62,16 +62,18 @@ Annotations are the SPDX Document properties and can be overriden by the command
 $ obom push -f ./examples/SPDXJSONExample-v2.3.spdx.json localhost:5001/spdx:example
 ================================================================================
 Document Name:         SPDX-Tools-v2.0
-DataLicense:           CC0-1.0
 Document Namespace:    http://spdx.org/spdxdocs/spdx-example-444504E0-4F89-41D3-9A0C-0305E82C3301
 SPDX Version:          SPDX-2.3
+Creation Date:         2010-01-29T18:30:22Z
+Creators:              LicenseFind-1.0
+                       ExampleCodeInspect ()
+                       Jane Doe ()
 Packages:              4
 Files:                 5
 Digest:                sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f
 ================================================================================
-Adding ./examples/SPDXJSONExample-v2.3.spdx.json: sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f
-Pushing localhost:5001/spdx:example sha256:07cc47f237cca9b699f2aba6d2684a20ece88268492e577194394030ca52e3de
-
+Pushing SBOM to localhost:5000/spdx:example@sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f...
+SBOM pushed to localhost:5000/spdx:example@sha256:e28661b0beea56f0a256abca303b4d4506b7961542ebb78cc987aad9975e8b4b
 ```
 
 You can view the manifest of the pushed artifact using the following command.
@@ -104,6 +106,36 @@ $ oras manifest get localhost:5001/spdx/annotations:test --pretty
     "org.spdx.version": "SPDX-2.3"
   }
 }
+```
+
+Artifacts can be attached via [OCI referrer artifacts](https://oras.land/docs/concepts/reftypes) using the --attach flag using the format of `artifactType=/path/to/artifact`. For example:
+
+```bash
+$ obom push -f ./examples/SPDXJSONExample-v2.3.spdx.json localhost:5000/spdx:example --attach application/json=./examples/artifact.example.json --attach application/yaml=./examples/artifact.example.yaml
+================================================================================
+Document Name:         SPDX-Tools-v2.0
+Document Namespace:    http://spdx.org/spdxdocs/spdx-example-444504E0-4F89-41D3-9A0C-0305E82C3301
+SPDX Version:          SPDX-2.3
+Creation Date:         2010-01-29T18:30:22Z
+Creators:              LicenseFind-1.0
+                       ExampleCodeInspect ()
+                       Jane Doe ()
+Packages:              4
+Files:                 5
+Digest:                sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f
+================================================================================
+Pushing SBOM to localhost:5000/spdx:example@sha256:2de3741a7be1be5f5e54e837524f2ec627fedfb82307dc004ae03b195abc092f...
+SBOM pushed to localhost:5000/spdx:example@sha256:a1f469bf749c1643b8d73848e237c29df0fb5b4490bbd86dfb05d064c72fa645
+```
+You can view the attached artifacts using the following command:
+
+```bash
+$ oras discover localhost:5000/spdx:example@sha256:a1f469bf749c1643b8d73848e237c29df0fb5b4490bbd86dfb05d064c72fa645
+localhost:5000/spdx@sha256:a1f469bf749c1643b8d73848e237c29df0fb5b4490bbd86dfb05d064c72fa645
+├── application/yaml
+│   └── sha256:f98e4542256fd718b95c0c785e97ccb3e24d17047e89bf3dab6193a205f11bd3
+└── application/json
+    └── sha256:afc2028285e3eb82c782beb4d7d188515e6a87b3a4d8bd69cc8df9a3686442ff
 ```
 
 ## obom packages
