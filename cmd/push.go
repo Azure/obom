@@ -158,11 +158,7 @@ func parseAttachArtifactFlags(flags []string) (map[string][]string, error) {
 		if !success {
 			return nil, fmt.Errorf("%w: %s", errAttachArtifactFormat, attach)
 		}
-		if attachArtifacts[key] != nil {
-			attachArtifacts[key] = append(attachArtifacts[key], val)
-		} else {
-			attachArtifacts[key] = []string{val}
-		}
+		attachArtifacts[key] = append(attachArtifacts[key], val)
 	}
 	return attachArtifacts, nil
 }
