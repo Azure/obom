@@ -39,9 +39,7 @@ $ obom show -f ./examples/SPDXJSONExample-v2.3.spdx.json
 Document Name:         SPDX-Tools-v2.0
 DataLicense:           CC0-1.0
 Document Namespace:    http://spdx.org/spdxdocs/spdx-example-444504E0-4F89-41D3-9A0C-0305E82C3301
-SPDX Version:          SPDX-2.3 # NOTE This is the default version for all spdx you have to comment out line 76 
-                                # from go\pkg\mod\github.com\spdx\tools-golang@v0.5.0\spdx\v2\v2_3\document.go
-                                # in order to pull the correct version from the actual SPDX JSON
+SPDX Version:          SPDX-2.3 
 Creation Date:         2010-01-29T18:30:22Z
 Creators:              LicenseFind-1.0
                        ExampleCodeInspect ()
