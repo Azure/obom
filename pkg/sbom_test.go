@@ -19,6 +19,18 @@ const spdxStr string = `{
 			}
 	}`
 
+const nonCompliantSPDXStr string = `{
+			"SPDXID": "NonCompliant",
+			"spdxVersion": "SPDX-2.2",
+			"name" : "SPDX-Example",
+			"documentNamespace" : "SPDX-Namespace-Example",
+			"creationInfo": {
+					"created": "2020-07-23T18:30:22Z",
+					"creators": ["Tool: SPDX-Java-Tools-v2.1.20", "Organization: Source Auditor Inc."],
+					"licenseListVersion": "3.6"
+			}
+	}`
+
 func TestLoadSBOMFromReader(t *testing.T) {
 
 	// Calculate the size of the SPDX string in bytes
@@ -51,6 +63,36 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	// Check if the byte arrays are equal
 	if !bytes.Equal(sbomBytes, expectedBytes) {
 		t.Errorf("expected sbomBytes to be %v, got: %v", expectedBytes, sbomBytes)
+	}
+}
+
+func TestLoadSBOMFromReader_NonCompliantSucceedsWhenStrictFalse(t *testing.T) {
+	// Create a test reader with the SPDX JSON data
+	reader := io.NopCloser(strings.NewReader(nonCompliantSPDXStr))
+
+	// Call the function with the test reader
+	sbomDoc, _, _, err := LoadSBOMFromReader(reader, false)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	if sbomDoc.Version != "SPDX-2.2" {
+		t.Errorf("expected SPDXVersion to be 'SPDX-2.2', got: %v", sbomDoc.Version)
+	}
+}
+
+func TestLoadSBOMFromReader_NonCompliantFailsWhenStrictTrue(t *testing.T) {
+	// Create a test reader with the SPDX JSON data
+	reader := io.NopCloser(strings.NewReader(nonCompliantSPDXStr))
+
+	// Call the function with the test reader
+	_, _, _, err := LoadSBOMFromReader(reader, true)
+
+	// Check that there was no error
+	if err == nil {
+		t.Fatalf("expected error when parsing with strict, got no err")
 	}
 }
 
