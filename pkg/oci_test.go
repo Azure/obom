@@ -30,7 +30,7 @@ func TestPushSBOM_Success_NoAttachArtifacts(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Load the SPDX document from the reader
-	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader)
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err != nil {
@@ -43,7 +43,7 @@ func TestPushSBOM_Success_NoAttachArtifacts(t *testing.T) {
 	}
 
 	// Call the PushSBOM function
-	sbomDesc, err := PushSBOM(doc, desc, sbomBytes, "localhost:5000/spdx:latest", annotations, false, nil, memDest)
+	sbomDesc, err := PushSBOM(doc.Document, desc, sbomBytes, "localhost:5000/spdx:latest", annotations, false, nil, memDest)
 	if err != nil {
 		t.Fatalf("expected no error from PushSBOM, got: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestPushSBOM_Success_WithAttachArtifacts(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Load the SPDX document from the reader
-	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader)
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err != nil {
@@ -125,7 +125,7 @@ func TestPushSBOM_Success_WithAttachArtifacts(t *testing.T) {
 	}
 
 	// Call the PushSBOM function
-	sbomDesc, err := PushSBOM(doc, desc, sbomBytes, "localhost:5000/spdx:latest", nil, false, attachArtifacts, memDest)
+	sbomDesc, err := PushSBOM(doc.Document, desc, sbomBytes, "localhost:5000/spdx:latest", nil, false, attachArtifacts, memDest)
 	if err != nil {
 		t.Fatalf("expected no error from PushSBOM, got: %v", err)
 	}

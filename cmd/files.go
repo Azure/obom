@@ -22,13 +22,13 @@ func filesCmd() *cobra.Command {
 Example:
 	obom files -f ./examples/SPDXJSONExample-v2.3.spdx.json`,
 		Run: func(cmd *cobra.Command, args []string) {
-			sbom, _, _, err := obom.LoadSBOMFromFile(opts.filename)
+			sbom, _, _, err := obom.LoadSBOMFromFile(opts.filename, true)
 			if err != nil {
 				fmt.Println("Error loading SBOM:", err)
 				os.Exit(1)
 			}
 
-			files, err := obom.GetFiles(sbom)
+			files, err := obom.GetFiles(sbom.Document)
 			if err != nil {
 				fmt.Println("Error getting files:", err)
 				os.Exit(1)

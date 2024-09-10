@@ -19,13 +19,13 @@ func packagesCmd() *cobra.Command {
 		Short: "List packages the SBOM",
 		Long:  `List packages the SBOM that have external refs`,
 		Run: func(cmd *cobra.Command, args []string) {
-			sbom, _, _, err := obom.LoadSBOMFromFile(opts.filename)
+			sbom, _, _, err := obom.LoadSBOMFromFile(opts.filename, true)
 			if err != nil {
 				fmt.Println("Error loading SBOM:", err)
 				os.Exit(1)
 			}
 
-			packages, err := obom.GetPackages(sbom)
+			packages, err := obom.GetPackages(sbom.Document)
 			if err != nil {
 				fmt.Println("Error getting packages:", err)
 				os.Exit(1)

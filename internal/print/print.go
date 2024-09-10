@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	obom "github.com/Azure/obom/pkg"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/spdx/tools-golang/spdx/v2/v2_3"
 )
@@ -23,15 +24,22 @@ func PrintCreatorInfo(doc *v2_3.Document) {
 }
 
 // PrintSBOMSummary returns the SPDX summary from the SBOM
-func PrintSBOMSummary(doc *v2_3.Document, desc *ocispec.Descriptor) {
+func PrintSBOMSummary(sbomDoc *obom.SPDXDocument, desc *ocispec.Descriptor) {
+	doc := sbomDoc.Document
 	fmt.Println(strings.Repeat("=", 80))
 	fmt.Printf("Document Name:         %s\n", doc.DocumentName)
 	fmt.Printf("Document Namespace:    %s\n", doc.DocumentNamespace)
-	fmt.Printf("SPDX Version:          %s\n", doc.SPDXVersion)
-	fmt.Printf("Creation Date:         %s\n", doc.CreationInfo.Created)
-	PrintCreatorInfo(doc)
-	fmt.Printf("Packages:              %d\n", len(doc.Packages))
-	fmt.Printf("Files:                 %d\n", len(doc.Files))
+	fmt.Printf("SPDX Version:          %s\n", sbomDoc.Version)
+	if doc.CreationInfo != nil {
+		fmt.Printf("Creation Date:         %s\n", doc.CreationInfo.Created)
+		PrintCreatorInfo(doc)
+	}
+	if doc.Packages != nil {
+		fmt.Printf("Packages:              %d\n", len(doc.Packages))
+	}
+	if doc.Files != nil {
+		fmt.Printf("Files:                 %d\n", len(doc.Files))
+	}
 	fmt.Printf("Digest:                %s\n", desc.Digest)
 	fmt.Println(strings.Repeat("=", 80))
 }

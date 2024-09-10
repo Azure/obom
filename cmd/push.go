@@ -21,6 +21,7 @@ type pushOpts struct {
 	reference           string
 	username            string
 	password            string
+	disableStrict       bool
 	pushSummary         bool
 	ManifestAnnotations []string
 	attachArtifacts     []string
@@ -42,6 +43,12 @@ func pushCmd() *cobra.Command {
 
 Example - Push an SPDX SBOM to a registry
 	obom push -f spdx.json localhost:5000/spdx:latest 
+
+Example - Push an SPDX SBOM to a registry with annotations
+	obom push -f spdx.json localhost:5000/spdx:latest --annotation key1=value1 --annotation key2=value2
+
+Example - Push an SPDX SBOM to a registry with strict SPDX parsing disabled
+	obom push -f spdx.json localhost:5000/spdx:latest --disable-strict
 
 Example - Push an SPDX SBOM to a registry with annotations
 	obom push -f spdx.json localhost:5000/spdx:latest --annotation key1=value1 --annotation key2=value2
@@ -78,7 +85,9 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 				os.Exit(1)
 			}
 
-			sbom, desc, bytes, err := obom.LoadSBOMFromFile(opts.filename)
+			// set the strict mode to the opposite of the disableStrict flag
+			strict := !opts.disableStrict
+			sbom, desc, bytes, err := obom.LoadSBOMFromFile(opts.filename, strict)
 			if err != nil {
 				fmt.Println("Error loading SBOM:", err)
 				os.Exit(1)
@@ -111,7 +120,7 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 			}
 
 			fmt.Printf("Pushing SBOM to %s@%s...\n", opts.reference, desc.Digest)
-			subject, err := obom.PushSBOM(sbom, desc, bytes, opts.reference, annotations, opts.pushSummary, attachArtifacts, repo)
+			subject, err := obom.PushSBOM(sbom.Document, desc, bytes, opts.reference, annotations, opts.pushSummary, attachArtifacts, repo)
 			if err != nil {
 				fmt.Println("Error pushing SBOM:", err)
 				os.Exit(1)
@@ -128,6 +137,7 @@ Example - Push an SPDX SBOM to a registry with attached artifacts where the key 
 	pushCmd.Flags().StringVarP(&opts.username, "username", "u", "", "Username for the registry")
 	pushCmd.Flags().StringVarP(&opts.password, "password", "p", "", "Password for the registry")
 	pushCmd.Flags().BoolVarP(&opts.pushSummary, "pushSummary", "s", false, "Push summary blob to the registry")
+	pushCmd.Flags().BoolVarP(&opts.disableStrict, "disable-strict", "r", false, "Disable strict SPDX parsing as per the SPDX specification. When disabled, obom will fall back to a simple JSON parsing strategy")
 	pushCmd.Flags().StringArrayVarP(&opts.attachArtifacts, "attach", "t", nil, "Attach artifacts to the SBOM")
 
 	// Add positional argument called reference to pushCmd
