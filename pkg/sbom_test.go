@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const spdxStr string = `{
@@ -41,7 +43,7 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdxStr))
 
 	// Call the function with the test reader
-	sbomDoc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
+	sbomDoc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true, "")
 
 	// Check that there was no error
 	if err != nil {
@@ -71,7 +73,7 @@ func TestLoadSBOMFromReader_NonCompliantSucceedsWhenStrictFalse(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(nonCompliantSPDXStr))
 
 	// Call the function with the test reader
-	sbomDoc, _, _, err := LoadSBOMFromReader(reader, false)
+	sbomDoc, _, _, err := LoadSBOMFromReader(reader, false, "")
 
 	// Check that there was no error
 	if err != nil {
@@ -88,7 +90,7 @@ func TestLoadSBOMFromReader_NonCompliantFailsWhenStrictTrue(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(nonCompliantSPDXStr))
 
 	// Call the function with the test reader
-	_, _, _, err := LoadSBOMFromReader(reader, true)
+	_, _, _, err := LoadSBOMFromReader(reader, true, "")
 
 	// Check that there was no error
 	if err == nil {
@@ -126,12 +128,38 @@ func TestLoadSBOMFromFile(t *testing.T) {
 	}
 }
 
+func TestLoadSBOMFromFile_ArtifactNameAnnotation(t *testing.T) {
+	// Define the path to the test file
+	filePath := "../examples/SPDXJSONExample-v2.3.spdx.json"
+
+	// Call the function with the test file path
+	_, desc, _, err := LoadSBOMFromFile(filePath, true)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Check that the artifact name annotation is set with the filename
+	if desc.Annotations == nil {
+		t.Fatalf("expected annotations to be set, got nil")
+	}
+
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != filePath {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, filePath, title)
+	}
+}
+
 func TestGetAnnotations(t *testing.T) {
 	// Create a test reader with the SPDX JSON data
 	reader := io.NopCloser(strings.NewReader(spdxStr))
 
 	// Call the function with the test reader
-	sbomDoc, _, _, err := LoadSBOMFromReader(reader, true)
+	sbomDoc, _, _, err := LoadSBOMFromReader(reader, true, "")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

@@ -40,16 +40,16 @@ func LoadSBOMFromFile(filename string, strict bool) (*SPDXDocument, *ocispec.Des
 	}
 	defer file.Close()
 
-	return LoadSBOMFromReader(file, strict)
+	return LoadSBOMFromReader(file, strict, filename)
 }
 
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
 // and returns the loaded SPDX document and the OCI descriptor.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser, strict bool) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
+func LoadSBOMFromReader(reader io.ReadCloser, strict bool, name string) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
 	defer reader.Close()
 
-	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX)
+	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX, name)
 	if err != nil {
 		return nil, nil, nil, err
 	}

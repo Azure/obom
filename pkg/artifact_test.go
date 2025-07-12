@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 func TestLoadArtifactFromFile(t *testing.T) {
@@ -42,7 +44,7 @@ func TestLoadArtifactFromReader(t *testing.T) {
 	reader := io.NopCloser(bytes.NewReader(testData))
 
 	// Call the function with the test reader and media type
-	desc, _, err := LoadArtifactFromReader(reader, mediaType)
+	desc, _, err := LoadArtifactFromReader(reader, mediaType, "")
 
 	// Check that there was no error
 	if err != nil {
@@ -58,5 +60,60 @@ func TestLoadArtifactFromReader(t *testing.T) {
 	}
 	if desc.Digest.String() != "sha256:40b61fe1b15af0a4d5402735b26343e8cf8a045f4d81710e6108a21d91eaf366" {
 		t.Errorf("expected desc.Digest to be 'sha256:40b61fe1b15af0a4d5402735b26343e8cf8a045f4d81710e6108a21d91eaf366', got: %s", desc.Digest.String())
+	}
+}
+
+func TestLoadArtifactFromReader_WithName(t *testing.T) {
+	// Define the test data and its size
+	testData := []byte(`{"test": "data"}`)
+	mediaType := "application/json"
+	artifactName := "test-artifact.json"
+
+	// Create a test reader with the test data
+	reader := io.NopCloser(bytes.NewReader(testData))
+
+	// Call the function with the test reader, media type, and name
+	desc, _, err := LoadArtifactFromReader(reader, mediaType, artifactName)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Check that the artifact name annotation is set
+	if desc.Annotations == nil {
+		t.Fatalf("expected annotations to be set, got nil")
+	}
+
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != artifactName {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, artifactName, title)
+	}
+}
+
+func TestLoadArtifactFromReader_WithoutName(t *testing.T) {
+	// Define the test data and its size
+	testData := []byte(`{"test": "data"}`)
+	mediaType := "application/json"
+
+	// Create a test reader with the test data
+	reader := io.NopCloser(bytes.NewReader(testData))
+
+	// Call the function with the test reader and media type, but no name
+	desc, _, err := LoadArtifactFromReader(reader, mediaType, "")
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Check that no annotations are set when name is empty
+	if desc.Annotations != nil {
+		if _, exists := desc.Annotations[ocispec.AnnotationTitle]; exists {
+			t.Errorf("expected no %s annotation when name is empty, but it was set", ocispec.AnnotationTitle)
+		}
 	}
 }
