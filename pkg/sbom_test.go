@@ -3,6 +3,7 @@ package obom
 import (
 	"bytes"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -43,7 +44,7 @@ func TestLoadSBOMFromReader(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdxStr))
 
 	// Call the function with the test reader
-	sbomDoc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true, "")
+	sbomDoc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err != nil {
@@ -73,7 +74,7 @@ func TestLoadSBOMFromReader_NonCompliantSucceedsWhenStrictFalse(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(nonCompliantSPDXStr))
 
 	// Call the function with the test reader
-	sbomDoc, _, _, err := LoadSBOMFromReader(reader, false, "")
+	sbomDoc, _, _, err := LoadSBOMFromReader(reader, false)
 
 	// Check that there was no error
 	if err != nil {
@@ -90,7 +91,7 @@ func TestLoadSBOMFromReader_NonCompliantFailsWhenStrictTrue(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(nonCompliantSPDXStr))
 
 	// Call the function with the test reader
-	_, _, _, err := LoadSBOMFromReader(reader, true, "")
+	_, _, _, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err == nil {
@@ -128,9 +129,10 @@ func TestLoadSBOMFromFile(t *testing.T) {
 	}
 }
 
-func TestLoadSBOMFromFile_ArtifactNameAnnotation(t *testing.T) {
+func TestLoadSBOMFromFile_ArtifactFilenameAnnotation(t *testing.T) {
 	// Define the path to the test file
 	filePath := "../examples/SPDXJSONExample-v2.3.spdx.json"
+	expectedFilename := "SPDXJSONExample-v2.3.spdx.json" // Only the base filename, not the full path
 
 	// Call the function with the test file path
 	_, desc, _, err := LoadSBOMFromFile(filePath, true)
@@ -140,7 +142,7 @@ func TestLoadSBOMFromFile_ArtifactNameAnnotation(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	// Check that the artifact name annotation is set with the filename
+	// Check that the artifact filename annotation is set with just the filename
 	if desc.Annotations == nil {
 		t.Fatalf("expected annotations to be set, got nil")
 	}
@@ -149,8 +151,57 @@ func TestLoadSBOMFromFile_ArtifactNameAnnotation(t *testing.T) {
 	if !exists {
 		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
 	}
-	if title != filePath {
-		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, filePath, title)
+	if title != expectedFilename {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
+	}
+}
+
+func TestLoadSBOMFromFile_FilenameExtractionFromPath(t *testing.T) {
+	// Test that filename is correctly extracted from various path formats
+	testCases := []struct {
+		name         string
+		filePath     string
+		expectedName string
+	}{
+		{
+			name:         "relative path with slash",
+			filePath:     "../examples/SPDXJSONExample-v2.3.spdx.json",
+			expectedName: "SPDXJSONExample-v2.3.spdx.json",
+		},
+		{
+			name:         "simple filename",
+			filePath:     "SPDXJSONExample-v2.3.spdx.json",
+			expectedName: "SPDXJSONExample-v2.3.spdx.json",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Skip if file doesn't exist (we're testing the filename extraction logic)
+			if _, err := os.Stat(tc.filePath); os.IsNotExist(err) {
+				t.Skipf("Test file %s does not exist", tc.filePath)
+			}
+
+			_, desc, _, err := LoadSBOMFromFile(tc.filePath, true)
+
+			// Check that there was no error
+			if err != nil {
+				t.Fatalf("expected no error for path '%s', got: %v", tc.filePath, err)
+			}
+
+			// Check that only the filename (not the path) is in the annotation
+			if desc.Annotations == nil {
+				t.Fatalf("expected annotations to be set for path '%s', got nil", tc.filePath)
+			}
+
+			title, exists := desc.Annotations[ocispec.AnnotationTitle]
+			if !exists {
+				t.Errorf("expected annotation %s to exist for path '%s'", ocispec.AnnotationTitle, tc.filePath)
+			}
+			if title != tc.expectedName {
+				t.Errorf("for path '%s', expected annotation %s to be '%s', got: %s", tc.filePath, ocispec.AnnotationTitle, tc.expectedName, title)
+			}
+		})
 	}
 }
 
@@ -159,7 +210,7 @@ func TestGetAnnotations(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdxStr))
 
 	// Call the function with the test reader
-	sbomDoc, _, _, err := LoadSBOMFromReader(reader, true, "")
+	sbomDoc, _, _, err := LoadSBOMFromReader(reader, true)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}

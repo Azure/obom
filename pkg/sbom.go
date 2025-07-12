@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -33,6 +34,7 @@ type SPDXDocument struct {
 // LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
 // It also calculates the file size and generates an OCI descriptor for the file.
 // It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
+// The filename path is used to open the file, but only the base filename is used for annotations.
 func LoadSBOMFromFile(filename string, strict bool) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -40,16 +42,19 @@ func LoadSBOMFromFile(filename string, strict bool) (*SPDXDocument, *ocispec.Des
 	}
 	defer file.Close()
 
-	return LoadSBOMFromReader(file, strict, filename)
+	// Extract just the filename without the path for the annotation
+	baseFilename := filepath.Base(filename)
+	return LoadSBOMFromReader(file, strict, baseFilename)
 }
 
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
 // and returns the loaded SPDX document and the OCI descriptor.
 // If an error occurs during reading the document or generating the descriptor, the error will be returned.
-func LoadSBOMFromReader(reader io.ReadCloser, strict bool, name string) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
+// The filename parameter is optional - if provided, it will be added as an annotation to the descriptor.
+func LoadSBOMFromReader(reader io.ReadCloser, strict bool, filename ...string) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
 	defer reader.Close()
 
-	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX, name)
+	desc, sbomBytes, err := LoadArtifactFromReader(reader, MEDIATYPE_SPDX, filename...)
 	if err != nil {
 		return nil, nil, nil, err
 	}

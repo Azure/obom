@@ -30,7 +30,7 @@ func TestPushSBOM_Success_NoAttachArtifacts(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Load the SPDX document from the reader
-	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true, "")
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err != nil {
@@ -112,7 +112,7 @@ func TestPushSBOM_Success_WithAttachArtifacts(t *testing.T) {
 	reader := io.NopCloser(strings.NewReader(spdx))
 
 	// Load the SPDX document from the reader
-	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true, "")
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(reader, true)
 
 	// Check that there was no error
 	if err != nil {
