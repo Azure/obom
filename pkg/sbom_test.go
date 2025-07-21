@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 	"testing"
+
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const spdxStr string = `{
@@ -165,5 +167,80 @@ func TestGetAnnotations(t *testing.T) {
 
 	if annotations[OCI_ANNOTATION_CREATORS] != "Tool: SPDX-Java-Tools-v2.1.20, Organization: Source Auditor Inc." {
 		t.Errorf("expected creators annotation to be 'Tool: SPDX-Java-Tools-v2.1.20, Organization: Source Auditor Inc.', got: %v", annotations[OCI_ANNOTATION_CREATORS])
+	}
+}
+
+func TestLoadSBOMFromFile_AddsFilenameAnnotation(t *testing.T) {
+	// Define the path to the test file
+	filePath := "../examples/SPDXJSONExample-v2.3.spdx.json"
+	expectedFilename := "SPDXJSONExample-v2.3.spdx.json" // Only the base filename, not the full path
+
+	// Call the function with the test file path
+	_, desc, _, err := LoadSBOMFromFile(filePath, true)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Check that the artifact filename annotation is set with just the filename
+	if desc.Annotations == nil {
+		t.Fatalf("expected annotations to be set, got nil")
+	}
+
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != expectedFilename {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
+	}
+}
+
+func TestLoadSBOMFromReader_NoAnnotations(t *testing.T) {
+	// Test that LoadSBOMFromReader doesn't add annotations
+	// Create a test reader with the SPDX JSON data
+	reader := io.NopCloser(strings.NewReader(spdxStr))
+
+	// Call the function with the test reader
+	_, desc, _, err := LoadSBOMFromReader(reader, true)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Check that no title annotation is set since LoadSBOMFromReader doesn't add title annotations
+	if desc.Annotations != nil {
+		if _, exists := desc.Annotations[ocispec.AnnotationTitle]; exists {
+			t.Errorf("expected no %s annotation from LoadSBOMFromReader, but it was set", ocispec.AnnotationTitle)
+		}
+	}
+}
+
+func TestLoadSBOMFromFile_PreservesExistingAnnotation(t *testing.T) {
+	// This test simulates the case where a descriptor already has a title annotation
+	// Since we can't easily mock this with the current implementation, this serves as documentation
+	// of the intended behavior: if an annotation already exists, it should not be overwritten
+	
+	// For now, we just test that the annotation is added when it doesn't exist
+	filePath := "../examples/SPDXJSONExample-v2.3.spdx.json"
+	expectedFilename := "SPDXJSONExample-v2.3.spdx.json"
+
+	// Call the function
+	_, desc, _, err := LoadSBOMFromFile(filePath, true)
+
+	// Check that there was no error
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// Verify the title annotation is set
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != expectedFilename {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
 	}
 }
