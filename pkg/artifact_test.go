@@ -144,3 +144,177 @@ func TestLoadArtifactFromFile_FilenameExtractionFromPath(t *testing.T) {
 		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
 	}
 }
+
+func TestAddFilenameAnnotationIfMissing_AddsAnnotationWhenMissing(t *testing.T) {
+	// Test adding annotation when descriptor has no annotations
+	desc := &ocispec.Descriptor{
+		MediaType: "application/json",
+		Size:      100,
+		Digest:    "sha256:abc123",
+	}
+	filename := "../path/to/test-file.json"
+	expectedFilename := "test-file.json"
+
+	AddFilenameAnnotationIfMissing(desc, filename)
+
+	// Check that annotations were created and title was set
+	if desc.Annotations == nil {
+		t.Fatalf("expected annotations to be created, got nil")
+	}
+
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != expectedFilename {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
+	}
+}
+
+func TestAddFilenameAnnotationIfMissing_AddsAnnotationWhenEmpty(t *testing.T) {
+	// Test adding annotation when descriptor has empty annotations map
+	desc := &ocispec.Descriptor{
+		MediaType:   "application/json",
+		Size:        100,
+		Digest:      "sha256:abc123",
+		Annotations: make(map[string]string),
+	}
+	filename := "test-file.json"
+	expectedFilename := "test-file.json"
+
+	AddFilenameAnnotationIfMissing(desc, filename)
+
+	// Check that title annotation was added
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != expectedFilename {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
+	}
+}
+
+func TestAddFilenameAnnotationIfMissing_AddsAnnotationWhenTitleEmpty(t *testing.T) {
+	// Test adding annotation when descriptor has annotations but empty title
+	desc := &ocispec.Descriptor{
+		MediaType: "application/json",
+		Size:      100,
+		Digest:    "sha256:abc123",
+		Annotations: map[string]string{
+			"other.annotation":      "some-value",
+			ocispec.AnnotationTitle: "", // Empty title
+		},
+	}
+	filename := "C:\\Windows\\System32\\test-file.json"
+	expectedFilename := "test-file.json"
+
+	AddFilenameAnnotationIfMissing(desc, filename)
+
+	// Check that title annotation was set
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != expectedFilename {
+		t.Errorf("expected annotation %s to be '%s', got: %s", ocispec.AnnotationTitle, expectedFilename, title)
+	}
+
+	// Check that other annotations are preserved
+	other, exists := desc.Annotations["other.annotation"]
+	if !exists || other != "some-value" {
+		t.Errorf("expected other annotations to be preserved")
+	}
+}
+
+func TestAddFilenameAnnotationIfMissing_PreservesExistingAnnotation(t *testing.T) {
+	// Test that existing non-empty title annotation is preserved
+	existingTitle := "existing-title.json"
+	desc := &ocispec.Descriptor{
+		MediaType: "application/json",
+		Size:      100,
+		Digest:    "sha256:abc123",
+		Annotations: map[string]string{
+			ocispec.AnnotationTitle: existingTitle,
+			"other.annotation":      "some-value",
+		},
+	}
+	filename := "new-filename.json"
+
+	AddFilenameAnnotationIfMissing(desc, filename)
+
+	// Check that existing title annotation was preserved
+	title, exists := desc.Annotations[ocispec.AnnotationTitle]
+	if !exists {
+		t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+	}
+	if title != existingTitle {
+		t.Errorf("expected annotation %s to be preserved as '%s', got: %s", ocispec.AnnotationTitle, existingTitle, title)
+	}
+
+	// Check that other annotations are preserved
+	other, exists := desc.Annotations["other.annotation"]
+	if !exists || other != "some-value" {
+		t.Errorf("expected other annotations to be preserved")
+	}
+}
+
+func TestAddFilenameAnnotationIfMissing_HandlesVariousPathFormats(t *testing.T) {
+	// Test that the function correctly extracts filenames from various path formats
+	testCases := []struct {
+		name         string
+		inputPath    string
+		expectedName string
+	}{
+		{
+			name:         "relative path with slash",
+			inputPath:    "../examples/test.json",
+			expectedName: "test.json",
+		},
+		{
+			name:         "simple filename",
+			inputPath:    "test.json",
+			expectedName: "test.json",
+		},
+		{
+			name:         "absolute unix path",
+			inputPath:    "/path/to/test.json",
+			expectedName: "test.json",
+		},
+		{
+			name:         "absolute windows path",
+			inputPath:    "C:\\Windows\\System32\\test.json",
+			expectedName: "test.json",
+		},
+		{
+			name:         "current directory",
+			inputPath:    "./test.json",
+			expectedName: "test.json",
+		},
+		{
+			name:         "windows style backslash",
+			inputPath:    "examples\\test.json",
+			expectedName: "test.json",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			desc := &ocispec.Descriptor{
+				MediaType: "application/json",
+				Size:      100,
+				Digest:    "sha256:abc123",
+			}
+
+			AddFilenameAnnotationIfMissing(desc, tc.inputPath)
+
+			// Check that the correct filename was extracted
+			title, exists := desc.Annotations[ocispec.AnnotationTitle]
+			if !exists {
+				t.Errorf("expected annotation %s to exist", ocispec.AnnotationTitle)
+			}
+			if title != tc.expectedName {
+				t.Errorf("for path '%s', expected annotation %s to be '%s', got: %s", tc.inputPath, ocispec.AnnotationTitle, tc.expectedName, title)
+			}
+		})
+	}
+}

@@ -21,14 +21,8 @@ func LoadArtifactFromFile(filename string, mediaType string) (*ocispec.Descripto
 		return nil, nil, err
 	}
 
-	// Check if the descriptor already has a title annotation, if not, add it
-	if desc.Annotations == nil || desc.Annotations[ocispec.AnnotationTitle] == "" {
-		if desc.Annotations == nil {
-			desc.Annotations = make(map[string]string)
-		}
-		// Use only the base filename, not the full path
-		desc.Annotations[ocispec.AnnotationTitle] = filepath.Base(filename)
-	}
+	// Add filename annotation if missing
+	AddFilenameAnnotationIfMissing(desc, filename)
 
 	return desc, artifactBytes, nil
 }
@@ -45,4 +39,16 @@ func LoadArtifactFromReader(reader io.ReadCloser, mediaType string) (*ocispec.De
 	desc := content.NewDescriptorFromBytes(mediaType, artifactBytes)
 
 	return &desc, artifactBytes, nil
+}
+
+// AddFilenameAnnotationIfMissing adds a title annotation to the descriptor using the base filename
+// if the annotation doesn't already exist or is empty. This function modifies the descriptor in-place.
+func AddFilenameAnnotationIfMissing(desc *ocispec.Descriptor, filename string) {
+	if desc.Annotations == nil || desc.Annotations[ocispec.AnnotationTitle] == "" {
+		if desc.Annotations == nil {
+			desc.Annotations = make(map[string]string)
+		}
+		// Use only the base filename, not the full path
+		desc.Annotations[ocispec.AnnotationTitle] = filepath.Base(filename)
+	}
 }

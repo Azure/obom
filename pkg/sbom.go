@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -47,14 +46,8 @@ func LoadSBOMFromFile(filename string, strict bool) (*SPDXDocument, *ocispec.Des
 		return nil, nil, nil, err
 	}
 
-	// Check if the descriptor already has a title annotation, if not, add it
-	if desc.Annotations == nil || desc.Annotations[ocispec.AnnotationTitle] == "" {
-		if desc.Annotations == nil {
-			desc.Annotations = make(map[string]string)
-		}
-		// Use only the base filename, not the full path
-		desc.Annotations[ocispec.AnnotationTitle] = filepath.Base(filename)
-	}
+	// Add filename annotation if missing
+	AddFilenameAnnotationIfMissing(desc, filename)
 
 	return doc, desc, sbomBytes, nil
 }
