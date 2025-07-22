@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"oras.land/oras-go/v2/content"
@@ -49,6 +50,12 @@ func AddFilenameAnnotationIfMissing(desc *ocispec.Descriptor, filename string) {
 			desc.Annotations = make(map[string]string)
 		}
 		// Use only the base filename, not the full path
-		desc.Annotations[ocispec.AnnotationTitle] = filepath.Base(filename)
+		// Handle both Unix and Windows path separators regardless of platform
+		basename := filepath.Base(filename)
+		// If filepath.Base didn't extract properly (e.g., Windows paths on Unix), try manual extraction
+		if lastSlash := strings.LastIndexByte(basename, '\\'); lastSlash >= 0 {
+			basename = basename[lastSlash+1:]
+		}
+		desc.Annotations[ocispec.AnnotationTitle] = basename
 	}
 }
