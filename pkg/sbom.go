@@ -33,6 +33,7 @@ type SPDXDocument struct {
 // LoadSBOMFromFile opens a file given by filename, reads its contents, and loads it into an SPDX document.
 // It also calculates the file size and generates an OCI descriptor for the file.
 // It returns the loaded SPDX document, the OCI descriptor, and any error encountered.
+// If the descriptor doesn't have a title annotation, it will be added using the base filename.
 func LoadSBOMFromFile(filename string, strict bool) (*SPDXDocument, *ocispec.Descriptor, []byte, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -40,7 +41,15 @@ func LoadSBOMFromFile(filename string, strict bool) (*SPDXDocument, *ocispec.Des
 	}
 	defer file.Close()
 
-	return LoadSBOMFromReader(file, strict)
+	doc, desc, sbomBytes, err := LoadSBOMFromReader(file, strict)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// Add filename annotation if missing
+	AddFilenameAnnotationIfMissing(desc, filename)
+
+	return doc, desc, sbomBytes, nil
 }
 
 // LoadSBOMFromReader reads an SPDX document from an io.ReadCloser, generates an OCI descriptor for the document,
