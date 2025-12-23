@@ -7,14 +7,14 @@ toolchain go1.24.1
 require (
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/package-url/packageurl-go v0.1.3
-	github.com/spdx/tools-golang v0.5.5
+	github.com/spdx/tools-golang v0.5.6
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.20.1
 	oras.land/oras-go/v2 v2.6.0
 )
 
 require (
-	github.com/anchore/go-struct-converter v0.0.0-20230627203149-c72ef8859ca9 // indirect
+	github.com/anchore/go-struct-converter v0.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
