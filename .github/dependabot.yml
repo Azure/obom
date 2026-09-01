@@ -9,3 +9,12 @@ updates:
       time: "15:00"
       timezone: "US/Pacific"
       
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
